@@ -5,10 +5,18 @@ import authRoutes from "./routes/authRoutes";
 import sessionRoutes from "./routes/sessionRoutes";
 import questionRoutes from "./routes/questionRoutes";
 import pool from "./config/database";
+import http from "http";
 
-dotenv.config();
+const envFile =
+    process.env.NODE_ENV === "production"
+        ? ".env.production.local"
+        : ".env.development.local";
 
-const app = express();
+dotenv.config({ path: envFile });
+
+console.log(`Environment loaded: ${envFile}`);
+
+export const app = express();
 
 app.use(express.json());
 app.use(passport.initialize());
@@ -27,10 +35,24 @@ pool.query("SELECT NOW()", (err, res) => {
     }
 });
 
-// Start the server
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-});
+let server: http.Server;
 
-export default app;
+if (process.env.NODE_ENV === "production") {
+    const port = process.env.PORT || 8080;
+    server = app.listen(port, () => {
+        console.log(
+            `Server running at http://localhost:${port}/ in production mode`,
+        );
+    });
+} else if (process.env.NODE_ENV === "development") {
+    if (require.main === module) {
+        const port = process.env.PORT || 3000;
+        server = app.listen(port, () => {
+            console.log(
+                `Server running at http://localhost:${port}/ in development mode`,
+            );
+        });
+    }
+}
+
+export { server };

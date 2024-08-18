@@ -1,21 +1,25 @@
 import request from "supertest";
-import app from "../app";
+import { app, server } from "../app";
 import pool from "../config/database";
+import { faker } from "@faker-js/faker";
 
 describe("Auth API Endpoints", () => {
-    // Run after all tests
     afterAll(async () => {
-        // Clean up the database and close the connection
-        await pool.query("DELETE FROM users WHERE email = $1", [
-            "testuser@example.com",
-        ]);
+        // Clean up dynamically created users
+        await pool.query("DELETE FROM users WHERE email LIKE '%@example.com'");
         await pool.end();
+        if (server) {
+            server.close();
+        }
     });
 
     it("should register a new user", async () => {
+        const email = faker.internet.email();
+        const password = faker.internet.password();
+
         const res = await request(app).post("/api/auth/register").send({
-            email: "testuser@example.com",
-            password: "password123",
+            email,
+            password,
         });
 
         expect(res.statusCode).toEqual(201);
@@ -23,13 +27,23 @@ describe("Auth API Endpoints", () => {
             "message",
             "User registered successfully",
         );
-        expect(res.body.user).toHaveProperty("email", "testuser@example.com");
+        expect(res.body.user).toHaveProperty("email", email);
     });
 
     it("should not register a user that already exists", async () => {
+        const email = "testuser@example.com";
+        const password = "password123";
+
+        // Register the user first
+        await request(app).post("/api/auth/register").send({
+            email,
+            password,
+        });
+
+        // Try registering again
         const res = await request(app).post("/api/auth/register").send({
-            email: "testuser@example.com",
-            password: "password123",
+            email,
+            password,
         });
 
         expect(res.statusCode).toEqual(400);
@@ -37,9 +51,12 @@ describe("Auth API Endpoints", () => {
     });
 
     it("should log in an existing user with valid credentials", async () => {
+        const email = "testuser@example.com";
+        const password = "password123";
+
         const res = await request(app).post("/api/auth/login").send({
-            email: "testuser@example.com",
-            password: "password123",
+            email,
+            password,
         });
 
         expect(res.statusCode).toEqual(200);

@@ -47,7 +47,7 @@ export const login = async (req: Request, res: Response) => {
                 process.env.JWT_SECRET as string,
                 { expiresIn: "6m" },
             );
-            res.json({ token });
+            res.json({ token, user });
         } else {
             res.status(401).json({ error: "Invalid credentials" });
         }
