@@ -21,6 +21,11 @@ export const generateQuestions = (
     range: number,
     operation: string,
 ): Question[] => {
+    console.log("Session ID:", sessionId);
+    console.log("Question Count:", questionCount);
+    console.log("Range:", range);
+    console.log("Operation:", operation);
+
     const rng = seedrandom(sessionId); // Use session ID as the seed
     const questions: Question[] = [];
 
@@ -64,6 +69,8 @@ export const generateQuestions = (
             correctAnswer,
         });
     }
+
+    console.log("QUESTIONS: ", questions);
 
     return questions;
 };
