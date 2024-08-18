@@ -1,79 +1,85 @@
--- Enable the UUID extension
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
--- Users table compatible with Passport.js for email and social logins (Google, Apple)
-CREATE TABLE users (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    email VARCHAR(255) UNIQUE NOT NULL,
-    google_id VARCHAR(255),
-    apple_id VARCHAR(255),
-    password_hash VARCHAR(255), -- For local email-based login if needed
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
+CREATE TABLE public.difficulty_levels (
+	id uuid DEFAULT uuid_generate_v4() NOT NULL,
+	level_name varchar(50) NOT NULL,
+	time_limit int4 NOT NULL,
+	CONSTRAINT difficulty_levels_level_name_key UNIQUE (level_name),
+	CONSTRAINT difficulty_levels_pkey PRIMARY KEY (id)
 );
 
--- Modes table storing the different modes (Test and Practice)
-CREATE TABLE modes (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    mode_name VARCHAR(50) UNIQUE NOT NULL -- 'Test' or 'Practice'
+CREATE TABLE public.modes (
+	id uuid DEFAULT uuid_generate_v4() NOT NULL,
+	mode_name varchar(50) NOT NULL,
+	CONSTRAINT modes_mode_name_key UNIQUE (mode_name),
+	CONSTRAINT modes_pkey PRIMARY KEY (id)
 );
 
--- Operations table storing the different operations (Addition, Subtraction, etc.)
-CREATE TABLE operations (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    operation_name VARCHAR(50) UNIQUE NOT NULL -- 'Addition', 'Subtraction', etc.
+CREATE TABLE public.number_ranges (
+	id uuid DEFAULT uuid_generate_v4() NOT NULL,
+	range_name varchar(50) NOT NULL,
+	CONSTRAINT number_ranges_pkey PRIMARY KEY (id),
+	CONSTRAINT number_ranges_range_name_key UNIQUE (range_name)
 );
 
--- Number Ranges table for the number ranges (1-10, 1-20, 1-100)
-CREATE TABLE number_ranges (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    range_name VARCHAR(50) UNIQUE NOT NULL -- '1-10', '1-20', '1-100'
+CREATE TABLE public.operations (
+	id uuid DEFAULT uuid_generate_v4() NOT NULL,
+	operation_name varchar(50) NOT NULL,
+	CONSTRAINT operations_operation_name_key UNIQUE (operation_name),
+	CONSTRAINT operations_pkey PRIMARY KEY (id)
 );
 
--- Difficulty Levels table storing different levels with corresponding time limits
-CREATE TABLE difficulty_levels (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    level_name VARCHAR(50) UNIQUE NOT NULL, -- 'Easy', 'Medium', 'Hard'
-    time_limit INT NOT NULL -- Time limit in seconds (for overall quiz time or each question)
+CREATE TABLE public.users (
+	id uuid DEFAULT uuid_generate_v4() NOT NULL,
+	email varchar(255) NOT NULL,
+	google_id varchar(255) NULL,
+	apple_id varchar(255) NULL,
+	password_hash varchar(255) NULL,
+	created_at timestamp DEFAULT now() NULL,
+	updated_at timestamp DEFAULT now() NULL,
+	CONSTRAINT users_email_key UNIQUE (email),
+	CONSTRAINT users_pkey PRIMARY KEY (id)
 );
 
--- Sessions table to track user sessions, including quiz setup
-CREATE TABLE sessions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID REFERENCES users(id),
-    mode_id UUID REFERENCES modes(id),
-    operation_id UUID REFERENCES operations(id),
-    range_id UUID REFERENCES number_ranges(id),
-    difficulty_id UUID REFERENCES difficulty_levels(id),
-    question_count INT NOT NULL,
-    overall_time_limit INT NOT NULL, -- Total time allowed for the session in seconds
-    started_at TIMESTAMP DEFAULT NOW(),
-    ended_at TIMESTAMP,
-    is_completed BOOLEAN DEFAULT FALSE
+CREATE TABLE public.sessions (
+	id uuid DEFAULT uuid_generate_v4() NOT NULL,
+	user_id uuid NULL,
+	mode_id uuid NULL,
+	operation_id uuid NULL,
+	range_id uuid NULL,
+	difficulty_id uuid NULL,
+	question_count int4 NOT NULL,
+	overall_time_limit int4 NOT NULL,
+	started_at timestamp DEFAULT now() NULL,
+	ended_at timestamp NULL,
+	is_completed bool DEFAULT false NULL,
+	CONSTRAINT sessions_pkey PRIMARY KEY (id),
+	CONSTRAINT sessions_difficulty_id_fkey FOREIGN KEY (difficulty_id) REFERENCES public.difficulty_levels(id),
+	CONSTRAINT sessions_mode_id_fkey FOREIGN KEY (mode_id) REFERENCES public.modes(id),
+	CONSTRAINT sessions_operation_id_fkey FOREIGN KEY (operation_id) REFERENCES public.operations(id),
+	CONSTRAINT sessions_range_id_fkey FOREIGN KEY (range_id) REFERENCES public.number_ranges(id)
 );
 
--- Questions table storing questions in BSON format
-CREATE TABLE questions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    session_id UUID REFERENCES sessions(id),
-    question_data JSONB NOT NULL, -- JSON structure with the question
-    correct_answer VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP DEFAULT NOW()
+CREATE TABLE public.questions (
+	id uuid DEFAULT uuid_generate_v4() NOT NULL,
+	session_id uuid NULL,
+	question_data jsonb NOT NULL,
+	correct_answer varchar(255) NOT NULL,
+	created_at timestamp DEFAULT now() NULL,
+	CONSTRAINT questions_pkey PRIMARY KEY (id),
+	CONSTRAINT questions_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.sessions(id)
 );
 
--- User Answers table to store each answer given in Test Mode
-CREATE TABLE user_answers (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID REFERENCES users(id),
-    session_id UUID REFERENCES sessions(id),
-    question_id UUID REFERENCES questions(id),
-    selected_answer VARCHAR(255),
-    is_correct BOOLEAN NOT NULL,
-    time_taken INT NOT NULL, -- Time taken to answer the question in seconds
-    answered_at TIMESTAMP DEFAULT NOW()
+CREATE TABLE public.user_answers (
+	id uuid DEFAULT uuid_generate_v4() NOT NULL,
+	user_id uuid NULL,
+	session_id uuid NULL,
+	question_id uuid NULL,
+	selected_answer varchar(255) NULL,
+	is_correct bool NOT NULL,
+	time_taken int4 NOT NULL,
+	answered_at timestamp DEFAULT now() NULL,
+	CONSTRAINT user_answers_pkey PRIMARY KEY (id),
+	CONSTRAINT user_answers_question_id_fkey FOREIGN KEY (question_id) REFERENCES public.questions(id),
+	CONSTRAINT user_answers_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.sessions(id)
 );
 
--- Indexing for efficient querying
-CREATE INDEX idx_user_answers_user_id ON user_answers(user_id);
-CREATE INDEX idx_user_answers_session_id ON user_answers(session_id);
-CREATE INDEX idx_user_answers_correctness ON user_answers(is_correct);
+CREATE INDEX idx_user_answers_correctness ON public.user_answers USING btree (is_correct);

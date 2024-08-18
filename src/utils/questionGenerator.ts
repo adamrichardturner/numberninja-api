@@ -18,7 +18,7 @@ interface Question {
 export const generateQuestions = (
     sessionId: string,
     questionCount: number,
-    range: number,
+    range: number, // Explicitly set range as number type
     operation: string,
 ): Question[] => {
     const rng = seedrandom(sessionId); // Use session ID as the seed
@@ -81,7 +81,7 @@ export const checkAnswer = (
     sessionId: string,
     questionIndex: number,
     selectedAnswer: number,
-    range: number,
+    range: number, // Explicitly set range as number type
     operation: string,
 ): { isCorrect: boolean; correctAnswer: number } => {
     // Generate questions up to the desired index (only generate the needed questions)
