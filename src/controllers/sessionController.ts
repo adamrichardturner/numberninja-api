@@ -1,9 +1,18 @@
 import { Request, Response } from "express";
 import { sessionService } from "../services/sessionService";
 
+import { v5 as uuidv5 } from "uuid";
+
 export const createSession = async (req: Request, res: Response) => {
-    const userId = req.user?.id;
-    console.log("USER ID:", userId);
+    const firebaseUid = req.user?.uid;
+    if (!firebaseUid) {
+        return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    // Convert Firebase UID to a UUID
+    const UUID_NAMESPACE = "1b671a64-40d5-491e-99b0-da01ff1f3341"; // You can generate this once and reuse
+    const userId = uuidv5(firebaseUid, UUID_NAMESPACE);
+
     const { mode, difficulty, operation, range } = req.body;
 
     try {
