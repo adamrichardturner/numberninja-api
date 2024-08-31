@@ -1,8 +1,8 @@
 import express from "express";
 import dotenv from "dotenv";
-import authRoutes from "./routes/authRoutes";
 import sessionRoutes from "./routes/sessionRoutes";
 import questionRoutes from "./routes/questionRoutes";
+import performanceRoutes from "./routes/performanceRoutes";
 import pool from "./config/database";
 import http from "http";
 import { firebaseAuth } from "./middleware/firebaseAuth";
@@ -23,10 +23,10 @@ app.use(express.json());
 // Apply Firebase authentication middleware to all routes except /api/auth
 app.use(/^(?!\/api\/auth).*$/, firebaseAuth);
 
-// Routes
-app.use("/api/auth", authRoutes);
-app.use("/api/sessions", sessionRoutes);
-app.use("/api/questions", questionRoutes);
+// Use routes
+app.use("/api", questionRoutes);
+app.use("/api", sessionRoutes);
+app.use("/api", performanceRoutes);
 
 // Database connection test
 pool.query("SELECT NOW()", (err, res) => {

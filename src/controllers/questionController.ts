@@ -1,7 +1,6 @@
 import { Request, Response } from "express";
-import { validate as isUuid } from "uuid";
-import { generateQuestions, checkAnswer } from "../utils/questionGenerator";
 import pool from "../config/database";
+import { generateQuestions, checkAnswer } from "../utils/questionGenerator";
 
 // Mapping from range UUIDs to numeric ranges
 const rangeMapping: { [key: string]: number } = {
@@ -19,91 +18,162 @@ const operationMapping: { [key: string]: string } = {
 };
 
 export const getQuestions = async (req: Request, res: Response) => {
-    const { sessionId } = req.params;
     try {
-        // Fetch questions for the given sessionId
-        const result = await pool.query(
-            "SELECT * FROM questions WHERE session_id = $1",
-            [sessionId],
-        );
-        res.status(200).json(result.rows);
-    } catch (error: unknown) {
-        if (error instanceof Error) {
-            console.error("Error fetching questions:", error.message);
-        } else {
-            console.error("Unexpected error:", error);
+        const sessionId = req.params.sessionId;
+
+        // Fetch session details from the database
+        const sessionQuery = "SELECT * FROM sessions WHERE id = $1";
+        const sessionResult = await pool.query(sessionQuery, [sessionId]);
+
+        if (sessionResult.rows.length === 0) {
+            return res.status(404).json({ error: "Session not found" });
         }
-        res.status(500).json({ error: "Error fetching questions" });
+
+        const session = sessionResult.rows[0];
+        const { question_count, range_id, operation_id } = session;
+
+        // Map the range_id and operation_id to their corresponding values
+        const rangeSelected = rangeMapping[range_id] || 10; // Default to 10 if not found
+        const operationSelected = operationMapping[operation_id];
+
+        console.log("operation selected", operationSelected);
+
+        console.log("RANGE", rangeSelected);
+        console.log("OPERATION", operationSelected);
+
+        if (!operationSelected) {
+            throw new Error(`Invalid operation_id: ${operation_id}`);
+        }
+
+        // Generate questions based on session parameters
+        const questions = generateQuestions(
+            sessionId,
+            question_count,
+            rangeSelected,
+            operationSelected,
+        );
+
+        // Return the generated questions
+        res.json(questions);
+    } catch (error) {
+        console.error("Error in getQuestions:", error);
+        res.status(500).json({ error: "Internal server error" });
     }
 };
 
 export const submitAnswers = async (req: Request, res: Response) => {
-    const { sessionId, answers } = req.body;
-
-    if (!isUuid(sessionId)) {
-        return res.status(400).json({ error: "Invalid session ID format" });
-    }
-
-    if (!Array.isArray(answers)) {
-        return res.status(400).json({ error: "Answers must be an array" });
-    }
-
     try {
-        const session = await pool.query(
-            "SELECT * FROM sessions WHERE id = $1",
-            [sessionId],
-        );
+        const sessionId = req.params.sessionId;
+        const { answers } = req.body;
 
-        if (!session.rows.length) {
+        // Fetch session details from the database
+        const sessionQuery = "SELECT * FROM sessions WHERE id = $1";
+        const sessionResult = await pool.query(sessionQuery, [sessionId]);
+
+        if (sessionResult.rows.length === 0) {
             return res.status(404).json({ error: "Session not found" });
         }
 
-        const { user_id, operation_id, range_id } = session.rows[0];
+        const session = sessionResult.rows[0];
+        const { range_id, operation_id } = session;
 
-        // Map operation_id to operation name
-        const operationName = operationMapping[operation_id];
-        if (!operationName) {
-            return res.status(400).json({ error: "Invalid operation ID" });
-        }
+        // Map the range_id and operation_id to their corresponding values
+        const range = rangeMapping[range_id] || 10; // Default to 10 if not found
+        const operation = operationMapping[operation_id] || "addition"; // Default to addition if not found
 
-        // Map range_id to numeric range
-        const range = rangeMapping[range_id];
-        if (!range) {
-            return res.status(400).json({ error: "Invalid range ID" });
-        }
+        let correctCount = 0;
+        let totalTime = 0;
 
-        const results = [];
-
+        // Check each answer and update the database
         for (const answer of answers) {
             const { questionIndex, selectedAnswer, timeTaken } = answer;
-
             const { isCorrect, correctAnswer } = checkAnswer(
                 sessionId,
                 questionIndex,
                 selectedAnswer,
                 range,
-                operationName,
+                operation,
             );
 
-            await pool.query(
-                `INSERT INTO user_answers (user_id, session_id, question_index, selected_answer, is_correct, time_taken)
-                VALUES ($1, $2, $3, $4, $5, $6)`,
-                [
-                    user_id,
-                    sessionId,
-                    questionIndex,
-                    selectedAnswer,
-                    isCorrect,
-                    timeTaken,
-                ],
-            );
+            if (isCorrect) {
+                correctCount++;
+            }
+            totalTime += timeTaken;
 
-            results.push({ questionIndex, isCorrect, correctAnswer });
+            // Insert the answer into the database
+            const insertAnswerQuery = `
+                INSERT INTO answers (session_id, question_index, user_answer, correct_answer, is_correct, time_taken)
+                VALUES ($1, $2, $3, $4, $5, $6)
+            `;
+            await pool.query(insertAnswerQuery, [
+                sessionId,
+                questionIndex,
+                selectedAnswer,
+                correctAnswer,
+                isCorrect,
+                timeTaken,
+            ]);
         }
 
-        res.status(200).json({ results });
+        // Update the session with the results
+        const updateSessionQuery = `
+            UPDATE sessions
+            SET correct_answers = $1, total_time = $2, completed_at = NOW()
+            WHERE id = $3
+        `;
+        await pool.query(updateSessionQuery, [
+            correctCount,
+            totalTime,
+            sessionId,
+        ]);
+
+        // Return the results
+        res.json({
+            correctAnswers: correctCount,
+            totalQuestions: answers.length,
+            totalTime,
+        });
     } catch (error) {
-        console.error("Error submitting answers:", error);
-        res.status(500).json({ error: "Error submitting answers" });
+        console.error("Error in submitAnswers:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+};
+
+export const getSessionResults = async (req: Request, res: Response) => {
+    try {
+        const sessionId = req.params.sessionId;
+
+        // Fetch session details from the database
+        const sessionQuery = "SELECT * FROM sessions WHERE id = $1";
+        const sessionResult = await pool.query(sessionQuery, [sessionId]);
+
+        if (sessionResult.rows.length === 0) {
+            return res.status(404).json({ error: "Session not found" });
+        }
+
+        const session = sessionResult.rows[0];
+
+        // Fetch answers for the session
+        const answersQuery = "SELECT * FROM answers WHERE session_id = $1";
+        const answersResult = await pool.query(answersQuery, [sessionId]);
+
+        // Calculate results
+        const totalQuestions = answersResult.rows.length;
+        const correctAnswers = answersResult.rows.filter(
+            answer => answer.is_correct,
+        ).length;
+        const wrongAnswers = totalQuestions - correctAnswers;
+
+        // Return the results
+        res.json({
+            sessionId,
+            totalQuestions,
+            correctAnswers,
+            wrongAnswers,
+            totalTime: session.total_time,
+        });
+    } catch (error) {
+        console.error("Error in getSessionResults:", error);
+        res.status(500).json({ error: "Internal server error" });
     }
 };
