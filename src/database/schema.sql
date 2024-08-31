@@ -1,3 +1,9 @@
+-- public.difficulty_levels definition
+
+-- Drop table
+
+-- DROP TABLE public.difficulty_levels;
+
 CREATE TABLE public.difficulty_levels (
 	id uuid DEFAULT uuid_generate_v4() NOT NULL,
 	level_name varchar(50) NOT NULL,
@@ -6,12 +12,26 @@ CREATE TABLE public.difficulty_levels (
 	CONSTRAINT difficulty_levels_pkey PRIMARY KEY (id)
 );
 
+
+-- public.modes definition
+
+-- Drop table
+
+-- DROP TABLE public.modes;
+
 CREATE TABLE public.modes (
 	id uuid DEFAULT uuid_generate_v4() NOT NULL,
 	mode_name varchar(50) NOT NULL,
 	CONSTRAINT modes_mode_name_key UNIQUE (mode_name),
 	CONSTRAINT modes_pkey PRIMARY KEY (id)
 );
+
+
+-- public.number_ranges definition
+
+-- Drop table
+
+-- DROP TABLE public.number_ranges;
 
 CREATE TABLE public.number_ranges (
 	id uuid DEFAULT uuid_generate_v4() NOT NULL,
@@ -20,12 +40,26 @@ CREATE TABLE public.number_ranges (
 	CONSTRAINT number_ranges_range_name_key UNIQUE (range_name)
 );
 
+
+-- public.operations definition
+
+-- Drop table
+
+-- DROP TABLE public.operations;
+
 CREATE TABLE public.operations (
 	id uuid DEFAULT uuid_generate_v4() NOT NULL,
 	operation_name varchar(50) NOT NULL,
 	CONSTRAINT operations_operation_name_key UNIQUE (operation_name),
 	CONSTRAINT operations_pkey PRIMARY KEY (id)
 );
+
+
+-- public.users definition
+
+-- Drop table
+
+-- DROP TABLE public.users;
 
 CREATE TABLE public.users (
 	id uuid DEFAULT uuid_generate_v4() NOT NULL,
@@ -38,6 +72,13 @@ CREATE TABLE public.users (
 	CONSTRAINT users_email_key UNIQUE (email),
 	CONSTRAINT users_pkey PRIMARY KEY (id)
 );
+
+
+-- public.sessions definition
+
+-- Drop table
+
+-- DROP TABLE public.sessions;
 
 CREATE TABLE public.sessions (
 	id uuid DEFAULT uuid_generate_v4() NOT NULL,
@@ -58,6 +99,13 @@ CREATE TABLE public.sessions (
 	CONSTRAINT sessions_range_id_fkey FOREIGN KEY (range_id) REFERENCES public.number_ranges(id)
 );
 
+
+-- public.questions definition
+
+-- Drop table
+
+-- DROP TABLE public.questions;
+
 CREATE TABLE public.questions (
 	id uuid DEFAULT uuid_generate_v4() NOT NULL,
 	session_id uuid NULL,
@@ -68,6 +116,13 @@ CREATE TABLE public.questions (
 	CONSTRAINT questions_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.sessions(id)
 );
 
+
+-- public.user_answers definition
+
+-- Drop table
+
+-- DROP TABLE public.user_answers;
+
 CREATE TABLE public.user_answers (
 	id uuid DEFAULT uuid_generate_v4() NOT NULL,
 	user_id uuid NULL,
@@ -77,9 +132,9 @@ CREATE TABLE public.user_answers (
 	is_correct bool NOT NULL,
 	time_taken int4 NOT NULL,
 	answered_at timestamp DEFAULT now() NULL,
+	question_index int4 NULL,
 	CONSTRAINT user_answers_pkey PRIMARY KEY (id),
 	CONSTRAINT user_answers_question_id_fkey FOREIGN KEY (question_id) REFERENCES public.questions(id),
 	CONSTRAINT user_answers_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.sessions(id)
 );
-
 CREATE INDEX idx_user_answers_correctness ON public.user_answers USING btree (is_correct);

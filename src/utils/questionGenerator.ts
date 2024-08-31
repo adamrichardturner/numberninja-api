@@ -81,10 +81,9 @@ export const checkAnswer = (
     sessionId: string,
     questionIndex: number,
     selectedAnswer: number,
-    range: number, // Explicitly set range as number type
+    range: number,
     operation: string,
 ): { isCorrect: boolean; correctAnswer: number } => {
-    // Generate questions up to the desired index (only generate the needed questions)
     const questions = generateQuestions(
         sessionId,
         questionIndex + 1,
@@ -92,9 +91,8 @@ export const checkAnswer = (
         operation,
     );
     const question = questions[questionIndex];
+    const correctAnswer = question.correctAnswer;
+    const isCorrect = selectedAnswer === correctAnswer;
 
-    return {
-        isCorrect: selectedAnswer === question.correctAnswer,
-        correctAnswer: question.correctAnswer,
-    };
+    return { isCorrect, correctAnswer };
 };

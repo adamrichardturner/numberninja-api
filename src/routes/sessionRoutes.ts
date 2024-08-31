@@ -1,18 +1,9 @@
 import { Router } from "express";
-import {
-    createSession,
-    getModes,
-    getOperations,
-    getRanges,
-    getDifficulties,
-} from "../controllers/sessionController";
+import { createSession } from "../controllers/sessionController";
+import { authMiddleware } from "../middleware/authMiddleware";
 
 const router = Router();
 
-router.post("/create", createSession);
-router.get("/modes", getModes);
-router.get("/operations", getOperations);
-router.get("/ranges", getRanges);
-router.get("/difficulties", getDifficulties);
+router.post("/sessions/create", authMiddleware, createSession);
 
 export default router;

@@ -1,48 +1,39 @@
 import { Request, Response } from "express";
-import pool from "../config/database";
+import { sessionService } from "../services/sessionService";
 
 export const createSession = async (req: Request, res: Response) => {
-    const {
-        userId,
-        modeId,
-        operationId,
-        rangeId,
-        difficultyId,
-        questionCount,
-        overallTimeLimit,
-    } = req.body;
+    const userId = req.user?.id;
+    console.log("USER ID:", userId);
+    const { mode, difficulty, operation, range } = req.body;
 
     try {
-        const result = await pool.query(
-            `INSERT INTO sessions (user_id, mode_id, operation_id, range_id, difficulty_id, question_count, overall_time_limit)
-            VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-            [
-                userId,
-                modeId,
-                operationId,
-                rangeId,
-                difficultyId,
-                questionCount,
-                overallTimeLimit,
-            ],
+        const sessionId = await sessionService.createSession(
+            userId,
+            mode.toLowerCase(),
+            difficulty.toLowerCase(),
+            operation.toLowerCase(),
+            range,
         );
-
-        res.status(201).json({ sessionId: result.rows[0].id });
+        res.status(201).json({ sessionId });
     } catch (error: unknown) {
         if (error instanceof Error) {
             console.error("Error creating session:", error.message);
+            res.status(400).json({ error: error.message });
         } else {
             console.error("Unexpected error:", error);
+            res.status(500).json({ error: "Error creating session" });
         }
-        res.status(500).json({ error: "Error creating session" });
     }
 };
 
-// Get available modes
 export const getModes = async (req: Request, res: Response) => {
     try {
-        const result = await pool.query("SELECT id, mode_name FROM modes");
-        res.status(200).json(result.rows);
+        const modes = await sessionService.getModes();
+        const formattedModes = modes.map(mode => ({
+            id: mode.id,
+            name: mode.mode_name.toLowerCase(),
+        }));
+        res.status(200).json(formattedModes);
     } catch (error: unknown) {
         if (error instanceof Error) {
             console.error("Error fetching modes:", error.message);
@@ -53,13 +44,10 @@ export const getModes = async (req: Request, res: Response) => {
     }
 };
 
-// Get available operations
 export const getOperations = async (req: Request, res: Response) => {
     try {
-        const result = await pool.query(
-            "SELECT id, operation_name FROM operations",
-        );
-        res.status(200).json(result.rows);
+        const operations = await sessionService.getOperations();
+        res.status(200).json(operations);
     } catch (error: unknown) {
         if (error instanceof Error) {
             console.error("Error fetching operations:", error.message);
@@ -70,13 +58,10 @@ export const getOperations = async (req: Request, res: Response) => {
     }
 };
 
-// Get available number ranges
 export const getRanges = async (req: Request, res: Response) => {
     try {
-        const result = await pool.query(
-            "SELECT id, range_name FROM number_ranges",
-        );
-        res.status(200).json(result.rows);
+        const ranges = await sessionService.getRanges();
+        res.status(200).json(ranges);
     } catch (error: unknown) {
         if (error instanceof Error) {
             console.error("Error fetching ranges:", error.message);
@@ -87,13 +72,10 @@ export const getRanges = async (req: Request, res: Response) => {
     }
 };
 
-// Get available difficulty levels
 export const getDifficulties = async (req: Request, res: Response) => {
     try {
-        const result = await pool.query(
-            "SELECT id, level_name FROM difficulty_levels",
-        );
-        res.status(200).json(result.rows);
+        const difficulties = await sessionService.getDifficulties();
+        res.status(200).json(difficulties);
     } catch (error: unknown) {
         if (error instanceof Error) {
             console.error("Error fetching difficulties:", error.message);
@@ -101,5 +83,20 @@ export const getDifficulties = async (req: Request, res: Response) => {
             console.error("Unexpected error:", error);
         }
         res.status(500).json({ error: "Error fetching difficulties" });
+    }
+};
+
+export const getQuestions = async (req: Request, res: Response) => {
+    const { sessionId } = req.params;
+    try {
+        const questions = await sessionService.getQuestions(sessionId);
+        res.status(200).json(questions);
+    } catch (error: unknown) {
+        if (error instanceof Error) {
+            console.error("Error fetching questions:", error.message);
+        } else {
+            console.error("Unexpected error:", error);
+        }
+        res.status(500).json({ error: "Error fetching questions" });
     }
 };
