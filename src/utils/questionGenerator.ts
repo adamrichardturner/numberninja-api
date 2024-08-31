@@ -78,21 +78,27 @@ export const generateQuestions = (
  * @returns An object containing whether the answer is correct and what the correct answer is.
  */
 export const checkAnswer = (
-    sessionId: string,
-    questionIndex: number,
-    selectedAnswer: number,
-    range: number,
+    numberA: number,
+    numberB: number,
     operation: string,
-): { isCorrect: boolean; correctAnswer: number } => {
-    const questions = generateQuestions(
-        sessionId,
-        questionIndex + 1,
-        range,
-        operation,
-    );
-    const question = questions[questionIndex];
-    const correctAnswer = question.correctAnswer;
-    const isCorrect = selectedAnswer === correctAnswer;
-
-    return { isCorrect, correctAnswer };
+    selectedAnswer: string,
+): boolean => {
+    let correctAnswer: number;
+    switch (operation) {
+        case "addition":
+            correctAnswer = numberA + numberB;
+            break;
+        case "subtraction":
+            correctAnswer = numberA - numberB;
+            break;
+        case "multiplication":
+            correctAnswer = numberA * numberB;
+            break;
+        case "division":
+            correctAnswer = numberA / numberB;
+            break;
+        default:
+            throw new Error(`Invalid operation: ${operation}`);
+    }
+    return correctAnswer.toString() === selectedAnswer;
 };

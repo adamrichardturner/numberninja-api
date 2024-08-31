@@ -64,32 +64,46 @@ export const questionService = {
             let totalTime = 0;
 
             for (const answer of answers) {
-                const { questionIndex, selectedAnswer, timeTaken } = answer;
-                const isCorrect = Boolean(answer.isCorrect); // Ensure it's a boolean
+                const {
+                    questionIndex,
+                    selectedAnswer,
+                    timeTaken,
+                    numberA,
+                    numberB,
+                    operation,
+                    isCorrect,
+                } = answer;
 
                 if (isCorrect) {
                     correctCount++;
                 }
-                totalTime += timeTaken;
 
                 const insertAnswerQuery = `
                     INSERT INTO user_answers (
                         user_id, 
                         session_id, 
                         selected_answer, 
-                        is_correct, 
                         time_taken, 
-                        question_index
-                    ) VALUES ($1, $2, $3, $4, $5, $6)
+                        question_index,
+                        number_a,
+                        number_b,
+                        operation,
+                        is_correct
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                 `;
                 await client.query(insertAnswerQuery, [
                     user_id,
                     sessionId,
                     selectedAnswer,
-                    isCorrect,
                     timeTaken,
                     questionIndex,
+                    numberA,
+                    numberB,
+                    operation,
+                    isCorrect,
                 ]);
+
+                totalTime += timeTaken;
             }
 
             const updateSessionQuery = `

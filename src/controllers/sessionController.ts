@@ -10,7 +10,7 @@ export const createSession = async (req: Request, res: Response) => {
     }
 
     // Convert Firebase UID to a UUID
-    const UUID_NAMESPACE = "1b671a64-40d5-491e-99b0-da01ff1f3341"; // You can generate this once and reuse
+    const UUID_NAMESPACE = "1b671a64-40d5-491e-99b0-da01ff1f3341";
     const userId = uuidv5(firebaseUid, UUID_NAMESPACE);
 
     const { mode, difficulty, operation, range } = req.body;
