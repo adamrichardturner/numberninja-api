@@ -1,11 +1,11 @@
 import express from "express";
 import dotenv from "dotenv";
-import passport from "./middleware/passport";
 import authRoutes from "./routes/authRoutes";
 import sessionRoutes from "./routes/sessionRoutes";
 import questionRoutes from "./routes/questionRoutes";
 import pool from "./config/database";
 import http from "http";
+import { firebaseAuth } from "./middleware/firebaseAuth";
 
 const envFile =
     process.env.NODE_ENV === "production"
@@ -19,7 +19,9 @@ console.log(`Environment loaded: ${envFile}`);
 export const app = express();
 
 app.use(express.json());
-app.use(passport.initialize());
+
+// Apply Firebase authentication middleware to all routes except /api/auth
+app.use(/^(?!\/api\/auth).*$/, firebaseAuth);
 
 // Routes
 app.use("/api/auth", authRoutes);

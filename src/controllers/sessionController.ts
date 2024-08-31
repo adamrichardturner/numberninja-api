@@ -2,15 +2,24 @@ import { Request, Response } from "express";
 import pool from "../config/database";
 
 export const createSession = async (req: Request, res: Response) => {
-    const {
-        userId,
-        modeId,
-        operationId,
-        rangeId,
-        difficultyId,
-        questionCount,
-        overallTimeLimit,
-    } = req.body;
+    const { userId, modeId, operationId, rangeId, difficultyId } = req.body;
+
+    const questionCount = 15;
+    let overallTimeLimit: number;
+
+    switch (difficultyId) {
+        case 1: // Easy
+            overallTimeLimit = 15 * 60; // 15 minutes in seconds
+            break;
+        case 2: // Medium
+            overallTimeLimit = 10 * 60; // 10 minutes in seconds
+            break;
+        case 3: // Hard
+            overallTimeLimit = 5 * 60; // 5 minutes in seconds
+            break;
+        default:
+            overallTimeLimit = 15 * 60; // Default to Easy mode time limit
+    }
 
     try {
         const result = await pool.query(
@@ -101,5 +110,24 @@ export const getDifficulties = async (req: Request, res: Response) => {
             console.error("Unexpected error:", error);
         }
         res.status(500).json({ error: "Error fetching difficulties" });
+    }
+};
+
+export const getQuestions = async (req: Request, res: Response) => {
+    const { sessionId } = req.params;
+    try {
+        // Fetch questions for the given sessionId
+        const result = await pool.query(
+            "SELECT * FROM questions WHERE session_id = $1",
+            [sessionId],
+        );
+        res.status(200).json(result.rows);
+    } catch (error: unknown) {
+        if (error instanceof Error) {
+            console.error("Error fetching questions:", error.message);
+        } else {
+            console.error("Unexpected error:", error);
+        }
+        res.status(500).json({ error: "Error fetching questions" });
     }
 };

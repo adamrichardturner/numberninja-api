@@ -1,57 +1,35 @@
 import { Request, Response } from "express";
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
+import admin from "firebase-admin";
 import pool from "../config/database";
 
 export const register = async (req: Request, res: Response) => {
     const { email, password } = req.body;
 
     try {
-        const hashedPassword = await bcrypt.hash(password, 10);
+        const userRecord = await admin.auth().createUser({
+            email,
+            password,
+        });
 
-        const existingUser = await pool.query(
-            "SELECT * FROM users WHERE email = $1",
-            [email],
-        );
-        if (existingUser.rows.length > 0) {
-            return res.status(400).json({ error: "User already exists" });
-        }
-
-        const result = await pool.query(
-            "INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING id, email",
-            [email, hashedPassword],
-        );
+        await pool.query("INSERT INTO users (id, email) VALUES ($1, $2)", [
+            userRecord.uid,
+            email,
+        ]);
 
         res.status(201).json({
             message: "User registered successfully",
-            user: result.rows[0],
+            user: { id: userRecord.uid, email },
         });
     } catch (error) {
+        console.error("Error registering user:", error);
         res.status(500).json({ error: "Error registering user" });
     }
 };
 
 export const login = async (req: Request, res: Response) => {
-    const { email, password } = req.body;
-
-    try {
-        const result = await pool.query(
-            "SELECT * FROM users WHERE email = $1",
-            [email],
-        );
-        const user = result.rows[0];
-
-        if (user && (await bcrypt.compare(password, user.password_hash))) {
-            const token = jwt.sign(
-                { id: user.id },
-                process.env.JWT_SECRET as string,
-                { expiresIn: "6m" },
-            );
-            res.json({ token, user });
-        } else {
-            res.status(401).json({ error: "Invalid credentials" });
-        }
-    } catch (error) {
-        res.status(500).json({ error: "Error logging in" });
-    }
+    // Firebase authentication is handled on the client-side
+    // This endpoint is not needed for Firebase auth
+    res.status(400).json({
+        error: "Use Firebase client SDK for authentication",
+    });
 };

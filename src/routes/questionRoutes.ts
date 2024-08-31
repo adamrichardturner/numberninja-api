@@ -1,9 +1,10 @@
 import { Router } from "express";
-import { getQuestions, submitAnswer } from "../controllers/questionController";
+import { getQuestions, submitAnswers } from "../controllers/questionController";
+import { authMiddleware } from "../middleware/authMiddleware";
 
 const router = Router();
 
-router.get("/:sessionId", getQuestions);
-router.post("/submit", submitAnswer);
+router.get("/questions/:sessionId", authMiddleware, getQuestions);
+router.post("/submit-answer", authMiddleware, submitAnswers);
 
 export default router;

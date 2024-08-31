@@ -18,6 +18,7 @@
         "bcryptjs": "^2.4.3",
         "dotenv": "^16.4.5",
         "express": "^4.19.2",
+        "firebase-admin": "^11.11.1",
         "jsonwebtoken": "^9.0.2",
         "passport": "^0.7.0",
         "passport-apple": "^2.0.2",

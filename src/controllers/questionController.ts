@@ -20,62 +20,32 @@ const operationMapping: { [key: string]: string } = {
 
 export const getQuestions = async (req: Request, res: Response) => {
     const { sessionId } = req.params;
-
-    if (!isUuid(sessionId)) {
-        return res.status(400).json({ error: "Invalid session ID format" });
-    }
-
     try {
-        const sessionResult = await pool.query(
-            "SELECT * FROM sessions WHERE id = $1",
+        // Fetch questions for the given sessionId
+        const result = await pool.query(
+            "SELECT * FROM questions WHERE session_id = $1",
             [sessionId],
         );
-
-        if (!sessionResult.rows.length) {
-            return res.status(404).json({ error: "Session not found" });
+        res.status(200).json(result.rows);
+    } catch (error: unknown) {
+        if (error instanceof Error) {
+            console.error("Error fetching questions:", error.message);
+        } else {
+            console.error("Unexpected error:", error);
         }
-
-        const session = sessionResult.rows[0];
-        const { question_count, range_id, operation_id } = session;
-
-        if (!question_count) {
-            return res.status(400).json({
-                error: "Invalid session configuration: missing question count",
-            });
-        }
-
-        // Map range_id to numeric range
-        const range = rangeMapping[range_id];
-        if (!range) {
-            return res.status(400).json({ error: "Invalid range ID" });
-        }
-
-        // Map operation_id to operation name
-        const operation = operationMapping[operation_id];
-        if (!operation) {
-            return res.status(400).json({ error: "Invalid operation ID" });
-        }
-
-        // Generate questions based on session data
-        const questions = generateQuestions(
-            sessionId,
-            question_count,
-            range,
-            operation,
-        );
-
-        res.status(200).json({ questions });
-    } catch (error) {
-        console.error("Error fetching questions:", error);
         res.status(500).json({ error: "Error fetching questions" });
     }
 };
 
-export const submitAnswer = async (req: Request, res: Response) => {
-    const { sessionId, questionIndex, selectedAnswer, timeTaken } = req.body;
+export const submitAnswers = async (req: Request, res: Response) => {
+    const { sessionId, answers } = req.body;
 
     if (!isUuid(sessionId)) {
         return res.status(400).json({ error: "Invalid session ID format" });
+    }
+
+    if (!Array.isArray(answers)) {
+        return res.status(400).json({ error: "Answers must be an array" });
     }
 
     try {
@@ -102,30 +72,38 @@ export const submitAnswer = async (req: Request, res: Response) => {
             return res.status(400).json({ error: "Invalid range ID" });
         }
 
-        const { isCorrect, correctAnswer } = checkAnswer(
-            sessionId,
-            questionIndex,
-            selectedAnswer,
-            range,
-            operationName,
-        );
+        const results = [];
 
-        await pool.query(
-            `INSERT INTO user_answers (user_id, session_id, question_index, selected_answer, is_correct, time_taken)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-            [
-                user_id,
+        for (const answer of answers) {
+            const { questionIndex, selectedAnswer, timeTaken } = answer;
+
+            const { isCorrect, correctAnswer } = checkAnswer(
                 sessionId,
                 questionIndex,
                 selectedAnswer,
-                isCorrect,
-                timeTaken,
-            ],
-        );
+                range,
+                operationName,
+            );
 
-        res.status(200).json({ isCorrect, correctAnswer });
+            await pool.query(
+                `INSERT INTO user_answers (user_id, session_id, question_index, selected_answer, is_correct, time_taken)
+                VALUES ($1, $2, $3, $4, $5, $6)`,
+                [
+                    user_id,
+                    sessionId,
+                    questionIndex,
+                    selectedAnswer,
+                    isCorrect,
+                    timeTaken,
+                ],
+            );
+
+            results.push({ questionIndex, isCorrect, correctAnswer });
+        }
+
+        res.status(200).json({ results });
     } catch (error) {
-        console.error("Error submitting answer:", error);
-        res.status(500).json({ error: "Error submitting answer" });
+        console.error("Error submitting answers:", error);
+        res.status(500).json({ error: "Error submitting answers" });
     }
 };
