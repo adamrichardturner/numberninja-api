@@ -35,3 +35,22 @@ export interface Session {
     overallTimeLimit: number;
     sessionId: string;
 }
+
+export interface Answer {
+    questionId: string;
+    userAnswer: number;
+    isCorrect: boolean;
+    timeTaken: number;
+}
+
+export interface SessionResults {
+    total_questions: number;
+    correct_answers: number;
+    total_time: number;
+}
+
+export interface SessionConfig {
+    operation: string;
+    range: string;
+    difficulty: string;
+}

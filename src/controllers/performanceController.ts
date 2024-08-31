@@ -105,7 +105,6 @@ export const getCommonWrongAnswers = async (req: Request, res: Response) => {
         res.status(500).json({ error: "Failed to fetch common wrong answers" });
     }
 };
-
 function getStartDate(period: string): Date {
     const now = new Date();
     switch (period) {

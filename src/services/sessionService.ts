@@ -1,4 +1,5 @@
 import pool from "../config/database";
+import { Answer } from "../types/Answer";
 
 export const sessionService = {
     createSession: async (
@@ -80,9 +81,62 @@ export const sessionService = {
         );
         return result.rows;
     },
+
+    submitAnswers: async (
+        sessionId: string,
+        answers: Answer[],
+    ): Promise<void> => {
+        const client = await pool.connect();
+        try {
+            await client.query("BEGIN");
+
+            for (const answer of answers) {
+                await client.query(
+                    `INSERT INTO user_answers (session_id, question_id, selected_answer, is_correct, time_taken, answered_at)
+                     VALUES ($1, $2, $3, $4, $5, NOW())`,
+                    [
+                        sessionId,
+                        answer.questionId,
+                        answer.userAnswer,
+                        answer.isCorrect,
+                        answer.timeTaken,
+                    ],
+                );
+            }
+
+            await client.query("COMMIT");
+        } catch (error) {
+            await client.query("ROLLBACK");
+            console.error("Error submitting answers:", error);
+            throw error;
+        } finally {
+            client.release();
+        }
+    },
+
+    getSessionResults: async (sessionId: string) => {
+        const result = await pool.query(
+            `SELECT s.id as session_id, s.overall_time_limit,
+                    COUNT(ua.id) as total_questions,
+                    SUM(CASE WHEN ua.is_correct THEN 1 ELSE 0 END) as correct_answers,
+                    SUM(ua.time_taken) as total_time_taken
+             FROM sessions s
+             LEFT JOIN user_answers ua ON s.id = ua.session_id
+             WHERE s.id = $1
+             GROUP BY s.id`,
+            [sessionId],
+        );
+
+        if (result.rows.length === 0) {
+            throw new Error(`Session not found: ${sessionId}`);
+        }
+
+        return result.rows[0];
+    },
 };
 
 async function getModeId(modeName: string): Promise<number> {
+    console.log("modeName", modeName);
     const result = await pool.query(
         "SELECT id FROM modes WHERE mode_name = $1",
         [modeName],

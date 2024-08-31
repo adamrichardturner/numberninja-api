@@ -3,6 +3,7 @@ import { sessionService } from "../services/sessionService";
 
 export const createSession = async (req: Request, res: Response) => {
     const userId = req.user?.id;
+    console.log("USER ID:", userId);
     const { mode, difficulty, operation, range } = req.body;
 
     try {
