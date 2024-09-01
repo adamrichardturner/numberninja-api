@@ -4,7 +4,9 @@ import { questionService } from "../services/questionService";
 export const getQuestions = async (req: Request, res: Response) => {
     try {
         const sessionId = req.params.sessionId;
+        console.log("Received sessionId:", sessionId);
         const questions = await questionService.getQuestions(sessionId);
+        console.log("Questions:", questions);
         res.json(questions);
     } catch (error) {
         console.error("Error in getQuestions:", error);

@@ -109,3 +109,19 @@ export const getQuestions = async (req: Request, res: Response) => {
         res.status(500).json({ error: "Error fetching questions" });
     }
 };
+
+export const endSession = async (req: Request, res: Response) => {
+    const { sessionId } = req.params;
+    try {
+        const endedSession = await sessionService.endSession(sessionId);
+        res.status(200).json(endedSession);
+    } catch (error: unknown) {
+        if (error instanceof Error) {
+            console.error("Error ending session:", error.message);
+            res.status(400).json({ error: error.message });
+        } else {
+            console.error("Unexpected error:", error);
+            res.status(500).json({ error: "Error ending session" });
+        }
+    }
+};

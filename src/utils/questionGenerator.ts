@@ -18,44 +18,41 @@ interface Question {
 export const generateQuestions = (
     sessionId: string,
     questionCount: number,
-    range: number, // Explicitly set range as number type
+    range: number,
     operation: string,
 ): Question[] => {
-    const rng = seedrandom(sessionId); // Use session ID as the seed
+    const rng = seedrandom(sessionId);
     const questions: Question[] = [];
 
     for (let i = 0; i < questionCount; i++) {
-        let numA = Math.floor(rng() * range) + 1;
-        let numB = Math.floor(rng() * range) + 1;
+        let numA: number, numB: number, correctAnswer: number;
 
-        // Ensure numB is not zero when performing division
-        if (operation === "division" && numB === 0) {
-            numB = 1;
-        }
-
-        // Handle division to ensure integer results only
-        if (operation === "division") {
-            // Adjust numA to make sure the division results in a whole number
-            numA = numA * numB;
-        }
-
-        let correctAnswer: number;
-        switch (operation) {
-            case "addition":
-                correctAnswer = numA + numB;
-                break;
-            case "subtraction":
-                correctAnswer = numA - numB;
-                break;
-            case "multiplication":
-                correctAnswer = numA * numB;
-                break;
-            case "division":
-                correctAnswer = numA / numB;
-                break;
-            default:
-                throw new Error("Invalid operation");
-        }
+        do {
+            switch (operation) {
+                case "addition":
+                    numA = Math.floor(rng() * (range - 1)) + 1;
+                    numB = Math.floor(rng() * (range - numA)) + 1;
+                    correctAnswer = numA + numB;
+                    break;
+                case "subtraction":
+                    numA = Math.floor(rng() * range) + 1;
+                    numB = Math.floor(rng() * numA) + 1;
+                    correctAnswer = numA - numB;
+                    break;
+                case "multiplication":
+                    numA = Math.floor(rng() * Math.sqrt(range)) + 1;
+                    numB = Math.floor(rng() * (range / numA)) + 1;
+                    correctAnswer = numA * numB;
+                    break;
+                case "division":
+                    numB = Math.floor(rng() * (Math.sqrt(range) - 1)) + 2;
+                    correctAnswer = Math.floor(rng() * (range / numB)) + 1;
+                    numA = correctAnswer * numB;
+                    break;
+                default:
+                    throw new Error("Invalid operation");
+            }
+        } while (numA > range || numB > range || correctAnswer > range);
 
         questions.push({
             numberA: numA,

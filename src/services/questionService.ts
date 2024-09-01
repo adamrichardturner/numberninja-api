@@ -28,8 +28,12 @@ export const questionService = {
         const session = sessionResult.rows[0];
         const { question_count, range_id, operation_id } = session;
 
-        const rangeSelected = rangeMapping[range_id] || 10;
+        const rangeSelected = rangeMapping[range_id];
         const operationSelected = operationMapping[operation_id];
+
+        if (!rangeSelected) {
+            throw new Error(`Invalid range_id: ${range_id}`);
+        }
 
         if (!operationSelected) {
             throw new Error(`Invalid operation_id: ${operation_id}`);
