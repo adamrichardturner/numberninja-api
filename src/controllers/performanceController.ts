@@ -1,37 +1,25 @@
 import { Request, Response } from "express";
-import pool from "../config/database";
+import { performanceService } from "../services/performanceService";
+import { v5 as uuidv5 } from "uuid";
+
+const UUID_NAMESPACE = "1b671a64-40d5-491e-99b0-da01ff1f3341";
 
 export const getSessionData = async (req: Request, res: Response) => {
     try {
-        if (!req.user) {
+        const firebaseUid = req.user?.uid;
+        if (!firebaseUid) {
             return res.status(401).json({ error: "Unauthorized" });
         }
-        const userId = req.user.uid;
+
+        const userId = uuidv5(firebaseUid, UUID_NAMESPACE);
         const { period } = req.query;
 
-        const startDate = getStartDate(period as string);
-        const query = `
-            SELECT 
-                COUNT(*) as total_sessions,
-                AVG(EXTRACT(EPOCH FROM (ended_at - started_at)) / 60) as average_duration,
-                COUNT(*) FILTER (WHERE is_completed = true) as completed_sessions
-            FROM sessions
-            WHERE user_id = $1 AND started_at >= $2
-        `;
-        const result = await pool.query(query, [userId, startDate]);
+        const sessionData = await performanceService.getSessionData(
+            userId,
+            period as string,
+        );
 
-        const { total_sessions, average_duration, completed_sessions } =
-            result.rows[0];
-        const averageScore =
-            completed_sessions > 0
-                ? (completed_sessions / total_sessions) * 100
-                : 0;
-
-        res.json({
-            totalSessions: parseInt(total_sessions),
-            averageScore: parseFloat(averageScore.toFixed(2)),
-            timeSpent: Math.round(parseFloat(average_duration)),
-        });
+        res.json(sessionData);
     } catch (error) {
         console.error("Error fetching session data:", error);
         res.status(500).json({ error: "Failed to fetch session data" });
@@ -40,32 +28,15 @@ export const getSessionData = async (req: Request, res: Response) => {
 
 export const getOperationPerformance = async (req: Request, res: Response) => {
     try {
-        if (!req.user) {
+        const firebaseUid = req.user?.uid;
+        if (!firebaseUid) {
             return res.status(401).json({ error: "Unauthorized" });
         }
-        const userId = req.user.uid;
 
-        const query = `
-            SELECT 
-                o.operation_name,
-                COUNT(*) as total_questions,
-                COUNT(*) FILTER (WHERE ua.is_correct = true) as correct_answers
-            FROM sessions s
-            JOIN operations o ON s.operation_id = o.id
-            JOIN questions q ON q.session_id = s.id
-            JOIN user_answers ua ON ua.question_id = q.id
-            WHERE s.user_id = $1
-            GROUP BY o.operation_name
-        `;
-        const result = await pool.query(query, [userId]);
+        const userId = uuidv5(firebaseUid, UUID_NAMESPACE);
 
-        const operationPerformance = result.rows.map(row => ({
-            operation: row.operation_name,
-            score: Math.round(
-                (row.correct_answers / row.total_questions) * 100,
-            ),
-            wrongAnswers: row.total_questions - row.correct_answers,
-        }));
+        const operationPerformance =
+            await performanceService.getOperationPerformance(userId);
 
         res.json(operationPerformance);
     } catch (error) {
@@ -76,45 +47,68 @@ export const getOperationPerformance = async (req: Request, res: Response) => {
     }
 };
 
-export const getCommonWrongAnswers = async (req: Request, res: Response) => {
+export const getStrugglingQuestions = async (req: Request, res: Response) => {
     try {
-        if (!req.user) {
+        const firebaseUid = req.user?.uid;
+        if (!firebaseUid) {
             return res.status(401).json({ error: "Unauthorized" });
         }
-        const userId = req.user.uid;
 
-        const query = `
-            SELECT 
-                q.question_data,
-                COUNT(*) as count
-            FROM user_answers ua
-            JOIN questions q ON ua.question_id = q.id
-            JOIN sessions s ON q.session_id = s.id
-            WHERE s.user_id = $1 AND ua.is_correct = false
-            GROUP BY q.question_data
-            ORDER BY count DESC
-            LIMIT 5
-        `;
-        const result = await pool.query(query, [userId]);
+        const userId = uuidv5(firebaseUid, UUID_NAMESPACE);
+        const { operation } = req.query;
 
-        const commonWrongAnswers = result.rows;
+        if (!operation) {
+            return res.status(400).json({ error: "Operation is required" });
+        }
 
-        res.json(commonWrongAnswers);
+        const strugglingQuestions =
+            await performanceService.getStrugglingQuestions(
+                userId,
+                operation as string,
+            );
+
+        res.json(strugglingQuestions);
     } catch (error) {
-        console.error("Error fetching common wrong answers:", error);
-        res.status(500).json({ error: "Failed to fetch common wrong answers" });
+        console.error("Error fetching struggling questions:", error);
+        res.status(500).json({ error: "Failed to fetch struggling questions" });
     }
 };
-function getStartDate(period: string): Date {
-    const now = new Date();
-    switch (period) {
-        case "week":
-            return new Date(now.setDate(now.getDate() - 7));
-        case "month":
-            return new Date(now.setMonth(now.getMonth() - 1));
-        case "year":
-            return new Date(now.setFullYear(now.getFullYear() - 1));
-        default:
-            return new Date(now.setMonth(now.getMonth() - 1)); // Default to last month
+
+export const getTotalStats = async (req: Request, res: Response) => {
+    try {
+        const firebaseUid = req.user?.uid;
+        if (!firebaseUid) {
+            return res.status(401).json({ error: "Unauthorized" });
+        }
+
+        const userId = uuidv5(firebaseUid, UUID_NAMESPACE);
+
+        const totalStats = await performanceService.getTotalStats(userId);
+
+        res.json(totalStats);
+    } catch (error) {
+        console.error("Error fetching total stats:", error);
+        res.status(500).json({ error: "Failed to fetch total stats" });
     }
-}
+};
+
+export const getPerformanceOverTime = async (req: Request, res: Response) => {
+    try {
+        const firebaseUid = req.user?.uid;
+        if (!firebaseUid) {
+            return res.status(401).json({ error: "Unauthorized" });
+        }
+
+        const userId = uuidv5(firebaseUid, UUID_NAMESPACE);
+
+        const performanceOverTime =
+            await performanceService.getPerformanceOverTime(userId);
+
+        res.json(performanceOverTime);
+    } catch (error) {
+        console.error("Error fetching performance over time:", error);
+        res.status(500).json({
+            error: "Failed to fetch performance over time",
+        });
+    }
+};
