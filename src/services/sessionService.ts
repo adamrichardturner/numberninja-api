@@ -147,7 +147,6 @@ export const sessionService = {
 };
 
 async function getModeId(modeName: string): Promise<number> {
-    console.log("modeName", modeName);
     const result = await pool.query(
         "SELECT id FROM modes WHERE mode_name = $1",
         [modeName],

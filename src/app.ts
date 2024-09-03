@@ -14,8 +14,6 @@ const envFile =
 
 dotenv.config({ path: envFile });
 
-console.log(`Environment loaded: ${envFile}`);
-
 export const app = express();
 
 app.use(express.json());

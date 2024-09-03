@@ -52,8 +52,6 @@ export const questionService = {
         try {
             await client.query("BEGIN");
 
-            console.log("Received answers:", answers);
-
             const sessionQuery = "SELECT * FROM sessions WHERE id = $1";
             const sessionResult = await client.query(sessionQuery, [sessionId]);
 
