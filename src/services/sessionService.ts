@@ -133,10 +133,20 @@ export const sessionService = {
 
         return result.rows[0];
     },
+
+    endSession: async (sessionId: string) => {
+        const result = await pool.query(
+            `UPDATE sessions SET ended_at = NOW() WHERE id = $1 RETURNING *`,
+            [sessionId],
+        );
+        if (result.rows.length === 0) {
+            throw new Error(`Session not found: ${sessionId}`);
+        }
+        return result.rows[0];
+    },
 };
 
 async function getModeId(modeName: string): Promise<number> {
-    console.log("modeName", modeName);
     const result = await pool.query(
         "SELECT id FROM modes WHERE mode_name = $1",
         [modeName],
