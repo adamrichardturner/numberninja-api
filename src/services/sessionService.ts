@@ -1,51 +1,59 @@
 import pool from "../config/database";
 import { Answer } from "../types/Answer";
+import { Operation } from "../types/session";
 
 export const sessionService = {
     createSession: async (
-        userId: string,
+        firebaseUid: string,
         mode: string,
+        operations: Operation[],
+        range: { min: number; max: number },
         difficulty: string,
-        operation: string,
-        range: string,
+        termA: number,
+        termB: number,
     ) => {
-        const questionCount = 15;
-        let overallTimeLimit: number;
+        const client = await pool.connect();
+        try {
+            await client.query("BEGIN");
 
-        const modeId = await getModeId(mode);
-        const operationId = await getOperationId(operation);
-        const rangeId = await getRangeId(range);
-        const difficultyId = await getDifficultyId(difficulty);
+            // Insert session
+            const sessionResult = await client.query(
+                "INSERT INTO sessions (user_id, mode_id, difficulty_id, question_count, overall_time_limit, started_at) VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING id",
+                [firebaseUid, mode, difficulty, 20, 600], // Adjust question_count and overall_time_limit as needed
+            );
+            const sessionId = sessionResult.rows[0].id;
 
-        switch (difficulty.toLowerCase()) {
-            case "easy":
-                overallTimeLimit = 15 * 60; // 15 minutes in seconds
-                break;
-            case "medium":
-                overallTimeLimit = 10 * 60; // 10 minutes in seconds
-                break;
-            case "hard":
-                overallTimeLimit = 5 * 60; // 5 minutes in seconds
-                break;
-            default:
-                overallTimeLimit = 15 * 60; // Default to Easy mode time limit
+            // Insert operations
+            for (const operation of operations) {
+                await client.query(
+                    "INSERT INTO session_operations (session_id, operation_id) VALUES ($1, $2)",
+                    [sessionId, operation],
+                );
+            }
+
+            // Insert range
+            const minValue = range.min ?? 1; // Provide a default value if min is null
+            const maxValue = range.max ?? 100; // Provide a default value if max is null
+            await client.query(
+                "INSERT INTO session_ranges (session_id, min_value, max_value) VALUES ($1, $2, $3)",
+                [sessionId, minValue, maxValue],
+            );
+
+            // Insert terms
+            await client.query(
+                "INSERT INTO session_terms (session_id, term_a, term_b) VALUES ($1, $2, $3)",
+                [sessionId, termA, termB],
+            );
+
+            await client.query("COMMIT");
+
+            return sessionId;
+        } catch (error) {
+            await client.query("ROLLBACK");
+            throw error;
+        } finally {
+            client.release();
         }
-
-        const result = await pool.query(
-            `INSERT INTO sessions (user_id, mode_id, operation_id, range_id, difficulty_id, question_count, overall_time_limit)
-            VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-            [
-                userId,
-                modeId,
-                operationId,
-                rangeId,
-                difficultyId,
-                questionCount,
-                overallTimeLimit,
-            ],
-        );
-
-        return result.rows[0].id;
     },
 
     getModes: async () => {
@@ -54,10 +62,15 @@ export const sessionService = {
     },
 
     getOperations: async () => {
-        const result = await pool.query(
-            "SELECT id, operation_name FROM operations",
-        );
-        return result.rows;
+        const client = await pool.connect();
+        try {
+            const result = await client.query(
+                "SELECT id, operation_name FROM operations",
+            );
+            return result.rows;
+        } finally {
+            client.release();
+        }
     },
 
     getRanges: async () => {
@@ -68,10 +81,15 @@ export const sessionService = {
     },
 
     getDifficulties: async () => {
-        const result = await pool.query(
-            "SELECT id, level_name FROM difficulty_levels",
-        );
-        return result.rows;
+        const client = await pool.connect();
+        try {
+            const result = await client.query(
+                "SELECT id, level_name FROM difficulty_levels",
+            );
+            return result.rows;
+        } finally {
+            client.release();
+        }
     },
 
     getQuestions: async (sessionId: string) => {
@@ -145,42 +163,3 @@ export const sessionService = {
         return result.rows[0];
     },
 };
-
-async function getModeId(modeName: string): Promise<number> {
-    const result = await pool.query(
-        "SELECT id FROM modes WHERE mode_name = $1",
-        [modeName],
-    );
-    if (result.rows.length === 0) throw new Error(`Invalid mode: ${modeName}`);
-    return result.rows[0].id;
-}
-
-async function getOperationId(operationName: string): Promise<number> {
-    const result = await pool.query(
-        "SELECT id FROM operations WHERE operation_name = $1",
-        [operationName],
-    );
-    if (result.rows.length === 0)
-        throw new Error(`Invalid operation: ${operationName}`);
-    return result.rows[0].id;
-}
-
-async function getRangeId(rangeName: string): Promise<number> {
-    const result = await pool.query(
-        "SELECT id FROM number_ranges WHERE range_name = $1",
-        [rangeName],
-    );
-    if (result.rows.length === 0)
-        throw new Error(`Invalid range: ${rangeName}`);
-    return result.rows[0].id;
-}
-
-async function getDifficultyId(difficultyName: string): Promise<number> {
-    const result = await pool.query(
-        "SELECT id FROM difficulty_levels WHERE level_name = $1",
-        [difficultyName],
-    );
-    if (result.rows.length === 0)
-        throw new Error(`Invalid difficulty: ${difficultyName}`);
-    return result.rows[0].id;
-}
