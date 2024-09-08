@@ -27,12 +27,16 @@ export const generateQuestions = (
         (acc, op) => ({ ...acc, [op]: 0 }),
         {} as Record<Operation, number>,
     );
-    const targetOperationCount = Math.floor(questionCount / operations.length);
+    const targetOperationCount = Math.ceil(questionCount / operations.length);
 
     while (questions.length < questionCount) {
+        const availableOperations = operations.filter(
+            op => operationCounts[op] < targetOperationCount,
+        );
         const operation =
-            operations.find(op => operationCounts[op] < targetOperationCount) ||
-            operations[0];
+            availableOperations[
+                Math.floor(Math.random() * availableOperations.length)
+            ];
         operationCounts[operation]++;
 
         let numA: number, numB: number, correctAnswer: number;
@@ -46,7 +50,7 @@ export const generateQuestions = (
                     numA = generateMultiple(range.min, range.max, terms.termA);
                     numB = generateMultiple(
                         range.min,
-                        Math.min(range.max - numA, range.max),
+                        range.max - numA,
                         terms.termB,
                     );
                     correctAnswer = numA + numB;
@@ -81,6 +85,9 @@ export const generateQuestions = (
                         1,
                     );
                     numA = correctAnswer * numB;
+                    // Ensure numA is also a multiple of termA
+                    numA = Math.floor(numA / terms.termA) * terms.termA;
+                    correctAnswer = numA / numB;
                     break;
                 default:
                     throw new Error(`Invalid operation: ${operation}`);
@@ -102,6 +109,8 @@ export const generateQuestions = (
             });
         }
     }
+
+    console.log("questions", questions);
 
     return questions;
 };
