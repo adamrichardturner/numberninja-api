@@ -12,12 +12,8 @@ export const getSessionData = async (req: Request, res: Response) => {
         }
 
         const userId = uuidv5(firebaseUid, UUID_NAMESPACE);
-        const { period } = req.query;
 
-        const sessionData = await performanceService.getSessionData(
-            userId,
-            period as string,
-        );
+        const sessionData = await performanceService.getSessionData(userId);
 
         res.json(sessionData);
     } catch (error) {
@@ -110,5 +106,27 @@ export const getPerformanceOverTime = async (req: Request, res: Response) => {
         res.status(500).json({
             error: "Failed to fetch performance over time",
         });
+    }
+};
+
+export const getCommonWrongAnswers = async (req: Request, res: Response) => {
+    try {
+        const firebaseUid = req.user?.uid;
+        if (!firebaseUid) {
+            return res.status(401).json({ error: "Unauthorized" });
+        }
+
+        const userId = uuidv5(firebaseUid, UUID_NAMESPACE);
+        const limit = req.query.limit
+            ? parseInt(req.query.limit as string)
+            : 20;
+
+        const commonWrongAnswers =
+            await performanceService.getCommonWrongAnswers(userId, limit);
+
+        res.json(commonWrongAnswers);
+    } catch (error) {
+        console.error("Error fetching common wrong answers:", error);
+        res.status(500).json({ error: "Failed to fetch common wrong answers" });
     }
 };
