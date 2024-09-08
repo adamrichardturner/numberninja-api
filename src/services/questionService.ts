@@ -22,12 +22,12 @@ export const questionService = {
             const { min_value, max_value } = rangeResult.rows[0];
 
             const operationsQuery =
-                "SELECT * FROM session_operations WHERE session_id = $1";
+                "SELECT o.operation_name FROM session_operations so JOIN operations o ON so.operation_id = o.id WHERE so.session_id = $1";
             const operationsResult = await client.query(operationsQuery, [
                 sessionId,
             ]);
-            const operations = operationsResult.rows.map(
-                row => row.operation_id,
+            const operations = operationsResult.rows.map(row =>
+                row.operation_name.toLowerCase(),
             );
 
             const termsQuery =

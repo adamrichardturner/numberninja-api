@@ -1,11 +1,12 @@
 import pool from "../config/database";
 import { Answer } from "../types/Answer";
+import { Operation } from "../types/session";
 
 export const sessionService = {
     createSession: async (
         firebaseUid: string,
         mode: string,
-        operations: string[],
+        operations: Operation[],
         range: { min: number; max: number },
         difficulty: string,
         termA: number,
@@ -31,9 +32,11 @@ export const sessionService = {
             }
 
             // Insert range
+            const minValue = range.min ?? 1; // Provide a default value if min is null
+            const maxValue = range.max ?? 100; // Provide a default value if max is null
             await client.query(
                 "INSERT INTO session_ranges (session_id, min_value, max_value) VALUES ($1, $2, $3)",
-                [sessionId, range.min, range.max],
+                [sessionId, minValue, maxValue],
             );
 
             // Insert terms
@@ -59,10 +62,15 @@ export const sessionService = {
     },
 
     getOperations: async () => {
-        const result = await pool.query(
-            "SELECT id, operation_name FROM operations",
-        );
-        return result.rows;
+        const client = await pool.connect();
+        try {
+            const result = await client.query(
+                "SELECT id, operation_name FROM operations",
+            );
+            return result.rows;
+        } finally {
+            client.release();
+        }
     },
 
     getRanges: async () => {
@@ -73,10 +81,15 @@ export const sessionService = {
     },
 
     getDifficulties: async () => {
-        const result = await pool.query(
-            "SELECT id, level_name FROM difficulty_levels",
-        );
-        return result.rows;
+        const client = await pool.connect();
+        try {
+            const result = await client.query(
+                "SELECT id, level_name FROM difficulty_levels",
+            );
+            return result.rows;
+        } finally {
+            client.release();
+        }
     },
 
     getQuestions: async (sessionId: string) => {

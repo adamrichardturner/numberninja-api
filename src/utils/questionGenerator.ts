@@ -22,90 +22,95 @@ export const generateQuestions = (
     operations: Operation[],
     terms: { termA: number; termB: number },
 ): Question[] => {
-    const rng = seedrandom(Date.now().toString());
     const questions: Question[] = [];
-    const generatedQuestions = new Set<string>();
-    let attempts = 0;
-    const maxAttempts = questionCount * 10;
-
-    while (questions.length < questionCount && attempts < maxAttempts) {
-        const operation = operations[Math.floor(rng() * operations.length)];
-        let numA: number, numB: number, correctAnswer: number;
-
-        switch (operation) {
-            case "addition":
-                numA =
-                    Math.floor(rng() * (range.max - range.min + 1)) + range.min;
-                numB = Math.floor(rng() * (range.max - numA + 1)) + range.min;
-                correctAnswer = numA + numB;
-                break;
-            case "subtraction":
-                numA =
-                    Math.floor(rng() * (range.max - range.min + 1)) + range.min;
-                numB = Math.floor(rng() * (numA - range.min + 1)) + range.min;
-                correctAnswer = numA - numB;
-                break;
-            case "multiplication":
-                numA =
-                    Math.floor(
-                        rng() *
-                            (Math.sqrt(range.max) - Math.sqrt(range.min) + 1),
-                    ) + Math.sqrt(range.min);
-                numB =
-                    Math.floor(
-                        rng() * (range.max / numA - range.min / numA + 1),
-                    ) +
-                    range.min / numA;
-                correctAnswer = numA * numB;
-                break;
-            case "division":
-                numB =
-                    Math.floor(
-                        rng() *
-                            (Math.sqrt(range.max) - Math.sqrt(range.min) + 1),
-                    ) + Math.sqrt(range.min);
-                correctAnswer =
-                    Math.floor(
-                        rng() * (range.max / numB - range.min / numB + 1),
-                    ) +
-                    range.min / numB;
-                numA = correctAnswer * numB;
-                break;
-            default:
-                throw new Error("Invalid operation");
-        }
-
-        if (
-            numA >= range.min &&
-            numA <= range.max &&
-            numB >= range.min &&
-            numB <= range.max &&
-            correctAnswer >= range.min &&
-            correctAnswer <= range.max &&
-            numA % terms.termA === 0 &&
-            numB % terms.termB === 0
-        ) {
-            const questionKey = `${numA}${operation}${numB}`;
-            if (!generatedQuestions.has(questionKey)) {
-                generatedQuestions.add(questionKey);
-                questions.push({
-                    numberA: numA,
-                    numberB: numB,
-                    operation,
-                    correctAnswer,
-                });
-            }
-        }
-
-        attempts++;
-    }
+    const operationCounts: Record<Operation, number> = operations.reduce(
+        (acc, op) => ({ ...acc, [op]: 0 }),
+        {} as Record<Operation, number>,
+    );
+    const targetOperationCount = Math.floor(questionCount / operations.length);
 
     while (questions.length < questionCount) {
-        const index = Math.floor(rng() * questions.length);
-        questions.push({ ...questions[index] });
+        const operation =
+            operations.find(op => operationCounts[op] < targetOperationCount) ||
+            operations[0];
+        operationCounts[operation]++;
+
+        let numA: number, numB: number, correctAnswer: number;
+        let attempts = 0;
+        const maxAttempts = 100;
+
+        do {
+            attempts++;
+            switch (operation) {
+                case "addition":
+                    numA = generateMultiple(range.min, range.max, terms.termA);
+                    numB = generateMultiple(
+                        range.min,
+                        Math.min(range.max - numA, range.max),
+                        terms.termB,
+                    );
+                    correctAnswer = numA + numB;
+                    break;
+                case "subtraction":
+                    numA = generateMultiple(range.min, range.max, terms.termA);
+                    numB = generateMultiple(range.min, numA, terms.termB);
+                    correctAnswer = numA - numB;
+                    break;
+                case "multiplication":
+                    numA = generateMultiple(
+                        range.min,
+                        Math.floor(Math.sqrt(range.max)),
+                        terms.termA,
+                    );
+                    numB = generateMultiple(
+                        range.min,
+                        Math.floor(range.max / numA),
+                        terms.termB,
+                    );
+                    correctAnswer = numA * numB;
+                    break;
+                case "division":
+                    numB = generateMultiple(
+                        range.min,
+                        Math.floor(Math.sqrt(range.max)),
+                        terms.termB,
+                    );
+                    correctAnswer = generateMultiple(
+                        range.min,
+                        Math.floor(range.max / numB),
+                        1,
+                    );
+                    numA = correctAnswer * numB;
+                    break;
+                default:
+                    throw new Error(`Invalid operation: ${operation}`);
+            }
+        } while (
+            (correctAnswer < range.min ||
+                correctAnswer > range.max ||
+                numA > range.max ||
+                numB > range.max) &&
+            attempts < maxAttempts
+        );
+
+        if (attempts < maxAttempts) {
+            questions.push({
+                numberA: numA,
+                numberB: numB,
+                operation,
+                correctAnswer,
+            });
+        }
     }
 
     return questions;
+};
+
+const generateMultiple = (min: number, max: number, factor: number): number => {
+    const lowerBound = Math.ceil(min / factor) * factor;
+    const upperBound = Math.floor(max / factor) * factor;
+    const range = (upperBound - lowerBound) / factor + 1;
+    return lowerBound + Math.floor(Math.random() * range) * factor;
 };
 
 /**
