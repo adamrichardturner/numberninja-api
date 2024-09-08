@@ -1,9 +1,10 @@
 import seedrandom from "seedrandom";
+import { Operation } from "../types/session";
 
 interface Question {
     numberA: number;
     numberB: number;
-    operation: string;
+    operation: Operation;
     correctAnswer: number;
 }
 
@@ -16,46 +17,74 @@ interface Question {
  * @returns An array of generated questions.
  */
 export const generateQuestions = (
-    sessionId: string,
     questionCount: number,
-    range: number,
-    operation: string,
+    range: { min: number; max: number },
+    operations: Operation[],
+    terms: { termA: number; termB: number },
 ): Question[] => {
-    const rng = seedrandom(sessionId);
+    const rng = seedrandom(Date.now().toString());
     const questions: Question[] = [];
     const generatedQuestions = new Set<string>();
     let attempts = 0;
-    const maxAttempts = questionCount * 10; // Arbitrary limit to prevent infinite loops
+    const maxAttempts = questionCount * 10;
 
     while (questions.length < questionCount && attempts < maxAttempts) {
+        const operation = operations[Math.floor(rng() * operations.length)];
         let numA: number, numB: number, correctAnswer: number;
 
         switch (operation) {
             case "addition":
-                numA = Math.floor(rng() * (range - 1)) + 1;
-                numB = Math.floor(rng() * (range - numA)) + 1;
+                numA =
+                    Math.floor(rng() * (range.max - range.min + 1)) + range.min;
+                numB = Math.floor(rng() * (range.max - numA + 1)) + range.min;
                 correctAnswer = numA + numB;
                 break;
             case "subtraction":
-                numA = Math.floor(rng() * range) + 1;
-                numB = Math.floor(rng() * numA) + 1;
+                numA =
+                    Math.floor(rng() * (range.max - range.min + 1)) + range.min;
+                numB = Math.floor(rng() * (numA - range.min + 1)) + range.min;
                 correctAnswer = numA - numB;
                 break;
             case "multiplication":
-                numA = Math.floor(rng() * Math.sqrt(range)) + 1;
-                numB = Math.floor(rng() * (range / numA)) + 1;
+                numA =
+                    Math.floor(
+                        rng() *
+                            (Math.sqrt(range.max) - Math.sqrt(range.min) + 1),
+                    ) + Math.sqrt(range.min);
+                numB =
+                    Math.floor(
+                        rng() * (range.max / numA - range.min / numA + 1),
+                    ) +
+                    range.min / numA;
                 correctAnswer = numA * numB;
                 break;
             case "division":
-                numB = Math.floor(rng() * (Math.sqrt(range) - 1)) + 2;
-                correctAnswer = Math.floor(rng() * (range / numB)) + 1;
+                numB =
+                    Math.floor(
+                        rng() *
+                            (Math.sqrt(range.max) - Math.sqrt(range.min) + 1),
+                    ) + Math.sqrt(range.min);
+                correctAnswer =
+                    Math.floor(
+                        rng() * (range.max / numB - range.min / numB + 1),
+                    ) +
+                    range.min / numB;
                 numA = correctAnswer * numB;
                 break;
             default:
                 throw new Error("Invalid operation");
         }
 
-        if (numA <= range && numB <= range && correctAnswer <= range) {
+        if (
+            numA >= range.min &&
+            numA <= range.max &&
+            numB >= range.min &&
+            numB <= range.max &&
+            correctAnswer >= range.min &&
+            correctAnswer <= range.max &&
+            numA % terms.termA === 0 &&
+            numB % terms.termB === 0
+        ) {
             const questionKey = `${numA}${operation}${numB}`;
             if (!generatedQuestions.has(questionKey)) {
                 generatedQuestions.add(questionKey);
@@ -71,7 +100,6 @@ export const generateQuestions = (
         attempts++;
     }
 
-    // If we couldn't generate enough unique questions, fill the rest with duplicates
     while (questions.length < questionCount) {
         const index = Math.floor(rng() * questions.length);
         questions.push({ ...questions[index] });

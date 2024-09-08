@@ -9,19 +9,17 @@ export const createSession = async (req: Request, res: Response) => {
         return res.status(401).json({ error: "Unauthorized" });
     }
 
-    // Convert Firebase UID to a UUID
-    const UUID_NAMESPACE = "1b671a64-40d5-491e-99b0-da01ff1f3341";
-    const userId = uuidv5(firebaseUid, UUID_NAMESPACE);
-
-    const { mode, difficulty, operation, range } = req.body;
+    const { mode, operations, range, difficulty, termA, termB } = req.body;
 
     try {
         const sessionId = await sessionService.createSession(
-            userId,
+            firebaseUid,
             mode.toLowerCase(),
-            difficulty.toLowerCase(),
-            operation.toLowerCase(),
+            operations.map((op: string) => op.toLowerCase()),
             range,
+            difficulty.toLowerCase(),
+            parseInt(termA),
+            parseInt(termB),
         );
         res.status(201).json({ sessionId });
     } catch (error: unknown) {
