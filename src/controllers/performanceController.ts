@@ -5,7 +5,6 @@ import { v5 as uuidv5 } from "uuid";
 const UUID_NAMESPACE = "1b671a64-40d5-491e-99b0-da01ff1f3341";
 
 export const getSessionData = async (req: Request, res: Response) => {
-    console.log("GET SESSION DATA CALLED");
     try {
         const firebaseUid = req.user?.uid;
         if (!firebaseUid) {
@@ -15,8 +14,6 @@ export const getSessionData = async (req: Request, res: Response) => {
         const userId = uuidv5(firebaseUid, UUID_NAMESPACE);
 
         const sessionData = await performanceService.getSessionData(userId);
-
-        console.log("SESSION DATA: ", sessionData);
 
         res.json(sessionData);
     } catch (error) {
@@ -37,7 +34,6 @@ export const getOperationPerformance = async (req: Request, res: Response) => {
         const operationPerformance =
             await performanceService.getOperationPerformance(userId);
 
-        console.log("OPERATION PERFORMANCE: ", operationPerformance);
         res.json(operationPerformance);
     } catch (error) {
         console.error("Error fetching operation performance:", error);
@@ -66,7 +62,7 @@ export const getStrugglingQuestions = async (req: Request, res: Response) => {
                 userId,
                 operation as string,
             );
-        console.log("STRUGGLE QUESTIONS: ", strugglingQuestions);
+
         res.json(strugglingQuestions);
     } catch (error) {
         console.error("Error fetching struggling questions:", error);
@@ -85,7 +81,6 @@ export const getTotalStats = async (req: Request, res: Response) => {
 
         const totalStats = await performanceService.getTotalStats(userId);
 
-        console.log("TOTAL STATS: ", totalStats);
         res.json(totalStats);
     } catch (error) {
         console.error("Error fetching total stats:", error);
@@ -105,7 +100,6 @@ export const getPerformanceOverTime = async (req: Request, res: Response) => {
         const performanceOverTime =
             await performanceService.getPerformanceOverTime(userId);
 
-        console.log("PERFORMANCE OVER TIME: ", performanceOverTime);
         res.json(performanceOverTime);
     } catch (error) {
         console.error("Error fetching performance over time:", error);
@@ -129,7 +123,7 @@ export const getCommonWrongAnswers = async (req: Request, res: Response) => {
 
         const commonWrongAnswers =
             await performanceService.getCommonWrongAnswers(userId, limit);
-        console.log("COMMON WRONG ANSWERS: ", commonWrongAnswers);
+
         res.json(commonWrongAnswers);
     } catch (error) {
         console.error("Error fetching common wrong answers:", error);
