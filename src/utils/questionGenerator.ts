@@ -21,98 +21,86 @@ export const generateQuestions = (
     range: { min: number; max: number },
     operations: Operation[],
     terms: { termA: number; termB: number },
-): Question[] => {
-    const questions: Question[] = [];
-    const operationCounts: Record<Operation, number> = operations.reduce(
-        (acc, op) => ({ ...acc, [op]: 0 }),
-        {} as Record<Operation, number>,
-    );
-    const targetOperationCount = Math.ceil(questionCount / operations.length);
+): Promise<Question[]> => {
+    return new Promise((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+            reject(new Error("Question generation timed out after 10 seconds"));
+        }, 10000);
 
-    while (questions.length < questionCount) {
-        const availableOperations = operations.filter(
-            op => operationCounts[op] < targetOperationCount,
-        );
-        const operation =
-            availableOperations[
-                Math.floor(Math.random() * availableOperations.length)
-            ];
-        operationCounts[operation]++;
+        try {
+            const questions: Question[] = [];
+            const usedQuestions = new Set<string>();
+            const operationCounts: Record<Operation, number> =
+                operations.reduce(
+                    (acc, op) => ({ ...acc, [op]: 0 }),
+                    {} as Record<Operation, number>,
+                );
 
-        let numA: number, numB: number, correctAnswer: number;
-        let attempts = 0;
-        const maxAttempts = 100;
+            while (questions.length < questionCount) {
+                const availableOperations = operations.filter(
+                    op =>
+                        operationCounts[op] ===
+                        Math.min(...Object.values(operationCounts)),
+                );
+                const operation =
+                    availableOperations[
+                        Math.floor(Math.random() * availableOperations.length)
+                    ];
 
-        do {
-            attempts++;
-            switch (operation) {
-                case "addition":
+                let numA: number, numB: number, correctAnswer: number;
+                let isValid = false;
+
+                while (!isValid) {
                     numA = generateMultiple(range.min, range.max, terms.termA);
-                    numB = generateMultiple(
-                        range.min,
-                        range.max - numA,
-                        terms.termB,
-                    );
-                    correctAnswer = numA + numB;
-                    break;
-                case "subtraction":
-                    numA = generateMultiple(range.min, range.max, terms.termA);
-                    numB = generateMultiple(range.min, numA, terms.termB);
-                    correctAnswer = numA - numB;
-                    break;
-                case "multiplication":
-                    numA = generateMultiple(
-                        range.min,
-                        Math.floor(Math.sqrt(range.max)),
-                        terms.termA,
-                    );
-                    numB = generateMultiple(
-                        range.min,
-                        Math.floor(range.max / numA),
-                        terms.termB,
-                    );
-                    correctAnswer = numA * numB;
-                    break;
-                case "division":
-                    numB = generateMultiple(
-                        range.min,
-                        Math.floor(Math.sqrt(range.max)),
-                        terms.termB,
-                    );
-                    correctAnswer = generateMultiple(
-                        range.min,
-                        Math.floor(range.max / numB),
-                        1,
-                    );
-                    numA = correctAnswer * numB;
-                    // Ensure numA is also a multiple of termA
-                    numA = Math.floor(numA / terms.termA) * terms.termA;
-                    correctAnswer = numA / numB;
-                    break;
-                default:
-                    throw new Error(`Invalid operation: ${operation}`);
+                    numB = generateMultiple(range.min, range.max, terms.termB);
+
+                    switch (operation) {
+                        case "addition":
+                            correctAnswer = numA + numB;
+                            isValid = correctAnswer <= range.max;
+                            break;
+                        case "subtraction":
+                            if (numA < numB) [numA, numB] = [numB, numA];
+                            correctAnswer = numA - numB;
+                            isValid = correctAnswer >= range.min;
+                            break;
+                        case "multiplication":
+                            correctAnswer = numA * numB;
+                            isValid = correctAnswer <= range.max;
+                            break;
+                        case "division":
+                            correctAnswer = numA;
+                            numA = numA * numB;
+                            isValid = numA <= range.max;
+                            break;
+                    }
+
+                    const questionKey = `${numA}${operation}${numB}`;
+                    if (usedQuestions.has(questionKey)) {
+                        isValid = false;
+                    }
+
+                    if (isValid) {
+                        questions.push({
+                            numberA: numA,
+                            numberB: numB,
+                            operation,
+                            correctAnswer,
+                        });
+                        usedQuestions.add(questionKey);
+                        operationCounts[operation]++;
+                    }
+                }
             }
-        } while (
-            (correctAnswer < range.min ||
-                correctAnswer > range.max ||
-                numA > range.max ||
-                numB > range.max) &&
-            attempts < maxAttempts
-        );
 
-        if (attempts < maxAttempts) {
-            questions.push({
-                numberA: numA,
-                numberB: numB,
-                operation,
-                correctAnswer,
-            });
+            console.log("Questions generated: ", questions);
+            clearTimeout(timeoutId);
+            resolve(questions);
+        } catch (error) {
+            clearTimeout(timeoutId);
+            reject(error);
         }
-    }
-
-    console.log("questions", questions);
-
-    return questions;
+    });
 };
 
 const generateMultiple = (min: number, max: number, factor: number): number => {
