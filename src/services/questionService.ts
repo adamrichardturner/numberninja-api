@@ -39,7 +39,7 @@ export const questionService = {
                 question_count,
                 { min: min_value, max: max_value },
                 operations as Operation[],
-                { termA: term_a, termB: term_b },
+                [{ termA: term_a, termB: term_b }], // Adjusted to match expected type
             );
 
             return questions;
