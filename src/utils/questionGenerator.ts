@@ -8,6 +8,16 @@ interface Question {
     correctAnswer: number;
 }
 
+type NumberPattern =
+    | "evens"
+    | "odds"
+    | "fives"
+    | "tens"
+    | "squares"
+    | "cubes"
+    | "primes"
+    | "any";
+
 /**
  * Generates a list of questions based on session parameters.
  * @param sessionId The session ID used as the seed for deterministic generation.
@@ -20,7 +30,7 @@ export const generateQuestions = (
     questionCount: number,
     range: { min: number; max: number },
     operations: Operation[],
-    terms: { termA: number; termB: number },
+    numberPatterns: NumberPattern[],
 ): Promise<Question[]> => {
     return new Promise((resolve, reject) => {
         const timeoutId = setTimeout(() => {
@@ -28,72 +38,57 @@ export const generateQuestions = (
         }, 10000);
 
         try {
+            const rng = seedrandom();
             const questions: Question[] = [];
             const usedQuestions = new Set<string>();
-            const operationCounts: Record<Operation, number> =
-                operations.reduce(
-                    (acc, op) => ({ ...acc, [op]: 0 }),
-                    {} as Record<Operation, number>,
-                );
 
-            while (questions.length < questionCount) {
-                const availableOperations = operations.filter(
-                    op =>
-                        operationCounts[op] ===
-                        Math.min(...Object.values(operationCounts)),
-                );
+            for (let i = 0; i < questionCount; i++) {
                 const operation =
-                    availableOperations[
-                        Math.floor(Math.random() * availableOperations.length)
-                    ];
-
-                let numA: number, numB: number, correctAnswer: number;
+                    operations[Math.floor(rng() * operations.length)];
+                let numA = range.min,
+                    numB = range.min,
+                    correctAnswer = 0;
                 let isValid = false;
 
                 while (!isValid) {
-                    numA = generateMultiple(range.min, range.max, terms.termA);
-                    numB = generateMultiple(range.min, range.max, terms.termB);
+                    const patternA =
+                        numberPatterns[
+                            Math.floor(rng() * numberPatterns.length)
+                        ];
+                    const patternB =
+                        numberPatterns[
+                            Math.floor(rng() * numberPatterns.length)
+                        ];
 
-                    switch (operation) {
-                        case "addition":
-                            correctAnswer = numA + numB;
-                            isValid = correctAnswer <= range.max;
-                            break;
-                        case "subtraction":
-                            if (numA < numB) [numA, numB] = [numB, numA];
-                            correctAnswer = numA - numB;
-                            isValid = correctAnswer >= range.min;
-                            break;
-                        case "multiplication":
-                            correctAnswer = numA * numB;
-                            isValid = correctAnswer <= range.max;
-                            break;
-                        case "division":
-                            correctAnswer = numA;
-                            numA = numA * numB;
-                            isValid = numA <= range.max;
-                            break;
-                    }
+                    numA = generateNumberByPattern(
+                        range.min,
+                        range.max,
+                        patternA,
+                    );
+                    numB = generateNumberByPattern(
+                        range.min,
+                        range.max,
+                        patternB,
+                    );
+
+                    [numA, numB, correctAnswer, isValid] =
+                        validateAndAdjustNumbers(numA, numB, operation, range);
 
                     const questionKey = `${numA}${operation}${numB}`;
                     if (usedQuestions.has(questionKey)) {
                         isValid = false;
                     }
-
-                    if (isValid) {
-                        questions.push({
-                            numberA: numA,
-                            numberB: numB,
-                            operation,
-                            correctAnswer,
-                        });
-                        usedQuestions.add(questionKey);
-                        operationCounts[operation]++;
-                    }
                 }
+
+                questions.push({
+                    numberA: numA,
+                    numberB: numB,
+                    operation,
+                    correctAnswer,
+                });
+                usedQuestions.add(`${numA}${operation}${numB}`);
             }
 
-            console.log("Questions generated: ", questions);
             clearTimeout(timeoutId);
             resolve(questions);
         } catch (error) {
@@ -103,12 +98,41 @@ export const generateQuestions = (
     });
 };
 
-const generateMultiple = (min: number, max: number, factor: number): number => {
-    const lowerBound = Math.ceil(min / factor) * factor;
-    const upperBound = Math.floor(max / factor) * factor;
-    const range = (upperBound - lowerBound) / factor + 1;
-    return lowerBound + Math.floor(Math.random() * range) * factor;
-};
+// Add this helper function
+function validateAndAdjustNumbers(
+    numA: number,
+    numB: number,
+    operation: Operation,
+    range: { min: number; max: number },
+): [number, number, number, boolean] {
+    let correctAnswer: number;
+    let isValid = false;
+
+    switch (operation) {
+        case "addition":
+            correctAnswer = numA + numB;
+            isValid = correctAnswer <= range.max;
+            break;
+        case "subtraction":
+            if (numA < numB) [numA, numB] = [numB, numA];
+            correctAnswer = numA - numB;
+            isValid = correctAnswer >= range.min;
+            break;
+        case "multiplication":
+            correctAnswer = numA * numB;
+            isValid = correctAnswer <= range.max;
+            break;
+        case "division":
+            if (numB === 0) return [numA, 1, numA, true]; // Avoid division by zero
+            correctAnswer = Math.floor(numA / numB);
+            numA = correctAnswer * numB; // Ensure clean division
+            isValid =
+                numA <= range.max && numA >= range.min && numB >= range.min;
+            break;
+    }
+
+    return [numA, numB, correctAnswer, isValid];
+}
 
 /**
  * Checks if the provided answer is correct based on the session parameters and generated question.
@@ -144,3 +168,49 @@ export const checkAnswer = (
     }
     return correctAnswer.toString() === selectedAnswer;
 };
+
+function isPrime(num: number): boolean {
+    for (let i = 2, sqrt = Math.sqrt(num); i <= sqrt; i++)
+        if (num % i === 0) return false;
+    return num > 1;
+}
+
+function generateNumberByPattern(
+    min: number,
+    max: number,
+    pattern: NumberPattern,
+): number {
+    const rng = seedrandom();
+    let num: number;
+    do {
+        num = Math.floor(rng() * (max - min + 1)) + min;
+        switch (pattern) {
+            case "evens":
+                num = num % 2 === 0 ? num : num + 1;
+                break;
+            case "odds":
+                num = num % 2 === 0 ? num + 1 : num;
+                break;
+            case "fives":
+                num = Math.round(num / 5) * 5;
+                break;
+            case "tens":
+                num = Math.round(num / 10) * 10;
+                break;
+            case "squares":
+                num = Math.pow(Math.round(Math.sqrt(num)), 2);
+                break;
+            case "cubes":
+                num = Math.pow(Math.round(Math.cbrt(num)), 3);
+                break;
+            case "primes":
+                while (!isPrime(num) && num <= max) num++;
+                if (num > max) num = 2; // Fallback to smallest prime if no prime in range
+                break;
+            case "any":
+                // No adjustment needed
+                break;
+        }
+    } while (num < min || num > max);
+    return num;
+}
