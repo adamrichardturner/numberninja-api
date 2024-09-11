@@ -16,6 +16,24 @@ export const userService = {
                 [userId],
             );
 
+            // Delete session operations
+            await pool.query(
+                "DELETE FROM session_operations WHERE session_id IN (SELECT id FROM sessions WHERE user_id = $1)",
+                [userId],
+            );
+
+            // Delete session ranges
+            await pool.query(
+                "DELETE FROM session_ranges WHERE session_id IN (SELECT id FROM sessions WHERE user_id = $1)",
+                [userId],
+            );
+
+            // Delete session terms
+            await pool.query(
+                "DELETE FROM session_terms WHERE session_id IN (SELECT id FROM sessions WHERE user_id = $1)",
+                [userId],
+            );
+
             // Delete user's sessions
             await pool.query("DELETE FROM sessions WHERE user_id = $1", [
                 userId,
