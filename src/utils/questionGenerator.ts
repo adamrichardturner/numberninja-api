@@ -13,7 +13,7 @@ interface Range {
     max: number;
 }
 
-const TIMEOUT = 30000; // 30 seconds timeout
+const TIMEOUT = 15000; // 15 seconds timeout
 
 export const generateQuestions = (
     questionCount: number,
@@ -21,8 +21,8 @@ export const generateQuestions = (
     operations: Operation[],
 ): Promise<Question[]> => {
     return new Promise((resolve, reject) => {
-        const startTime = Date.now();
         const questions: Question[] = [];
+        const usedQuestions = new Set<string>();
 
         const attemptGeneration = () => {
             const seed = Date.now().toString();
@@ -39,33 +39,60 @@ export const generateQuestions = (
                     operationCounts,
                     rng,
                 );
-                const numA = getRandomNumber(range.min, range.max, rng);
-                const numB = getRandomNumber(range.min, range.max, rng);
+                let question: Question | null = null;
+                let attempts = 0;
 
-                let question = createValidQuestion(
-                    numA,
-                    numB,
-                    operation,
-                    range,
-                );
+                while (!question && attempts < 100) {
+                    const numA = getRandomNumber(
+                        Math.max(1, range.min),
+                        range.max,
+                        rng,
+                    );
+                    const numB = getRandomNumber(
+                        Math.max(1, range.min),
+                        range.max,
+                        rng,
+                    );
+                    question = createValidQuestion(
+                        numA,
+                        numB,
+                        operation,
+                        range,
+                    );
+
+                    if (question) {
+                        const questionKey = `${question.numberA}-${question.numberB}-${question.operation}`;
+                        if (usedQuestions.has(questionKey)) {
+                            question = null;
+                        } else {
+                            usedQuestions.add(questionKey);
+                        }
+                    }
+
+                    attempts++;
+                }
 
                 if (!question) {
                     question = createSimpleQuestion(range, operation, rng);
+                    const questionKey = `${question.numberA}-${question.numberB}-${question.operation}`;
+                    usedQuestions.add(questionKey);
                 }
 
                 questions.push(question);
                 operationCounts[operation]++;
-
-                if (Date.now() - startTime > TIMEOUT) {
-                    reject(new Error("Question generation timed out"));
-                    return;
-                }
             }
 
             resolve(questions);
         };
 
+        const timeoutId = setTimeout(() => {
+            reject(new Error("Question generation timed out"));
+        }, TIMEOUT);
+
         attemptGeneration();
+
+        // Clear the timeout if questions are generated successfully
+        clearTimeout(timeoutId);
     });
 };
 
@@ -96,40 +123,30 @@ const createValidQuestion = (
     range: Range,
 ): Question | null => {
     let correctAnswer: number;
-    let difficulty: number = 0;
+    let [a, b] = [numA, numB]; // New line
 
     switch (operation) {
         case "addition":
-            if (numA === 0 || numB === 0) return null; // Avoid trivial additions
-            correctAnswer = numA + numB;
-            difficulty = Math.min(numA, numB) / range.max; // Higher difficulty for larger numbers
+            correctAnswer = a + b;
             break;
         case "subtraction":
-            if (numA < numB) [numA, numB] = [numB, numA];
-            if (numB === 0) return null; // Avoid trivial subtractions
-            correctAnswer = numA - numB;
-            difficulty = numB / range.max; // Higher difficulty for larger numbers being subtracted
+            if (a < b) [a, b] = [b, a];
+            correctAnswer = a - b;
             break;
         case "multiplication":
-            if (numA === 1 || numB === 1) return null; // Avoid trivial multiplications
-            correctAnswer = numA * numB;
-            difficulty = (numA * numB) / (range.max * range.max); // Higher difficulty for larger products
+            correctAnswer = a * b;
             break;
         case "division":
-            if (numB === 0 || numB === 1) return null; // Avoid division by 0 or 1
-            correctAnswer = Math.floor(numA / numB);
-            numA = correctAnswer * numB; // Ensure clean division
-            difficulty = numB / range.max; // Higher difficulty for larger divisors
+            if (b === 0) return null;
+            correctAnswer = Math.floor(a / b);
+            a = correctAnswer * b; // Ensure clean division
             break;
         default:
             throw new Error(`Invalid operation: ${operation}`);
     }
 
-    // Only accept questions with a minimum difficulty
-    if (difficulty < 0.3) return null;
-
     return correctAnswer <= range.max && correctAnswer >= range.min
-        ? { numberA: numA, numberB: numB, operation, correctAnswer }
+        ? { numberA: a, numberB: b, operation, correctAnswer }
         : null;
 };
 
@@ -138,8 +155,8 @@ const createSimpleQuestion = (
     operation: Operation,
     rng: seedrandom.PRNG,
 ): Question => {
-    const numA = getRandomNumber(range.min, range.max, rng);
-    const numB = getRandomNumber(range.min, range.max, rng);
+    let numA = getRandomNumber(Math.max(1, range.min), range.max, rng);
+    let numB = getRandomNumber(Math.max(1, range.min), range.max, rng);
     let correctAnswer: number;
 
     switch (operation) {
@@ -147,13 +164,15 @@ const createSimpleQuestion = (
             correctAnswer = numA + numB;
             break;
         case "subtraction":
-            correctAnswer = Math.max(numA, numB) - Math.min(numA, numB);
+            if (numA < numB) [numA, numB] = [numB, numA];
+            correctAnswer = numA - numB;
             break;
         case "multiplication":
             correctAnswer = numA * numB;
             break;
         case "division":
             correctAnswer = numA;
+            numB = getRandomNumber(1, Math.min(numA, range.max), rng);
             return {
                 numberA: numA * numB,
                 numberB: numB,
