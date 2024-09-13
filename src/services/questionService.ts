@@ -26,14 +26,10 @@ export const questionService = {
             const operationsResult = await client.query(operationsQuery, [
                 sessionId,
             ]);
+
             const operations = operationsResult.rows.map(row =>
                 row.operation_name.toLowerCase(),
             );
-
-            const termsQuery =
-                "SELECT * FROM session_terms WHERE session_id = $1";
-            const termsResult = await client.query(termsQuery, [sessionId]);
-            const { term_a, term_b } = termsResult.rows[0];
 
             const questions = generateQuestions(
                 question_count,

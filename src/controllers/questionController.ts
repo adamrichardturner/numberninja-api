@@ -6,6 +6,8 @@ export const getQuestions = async (req: Request, res: Response) => {
         const sessionId = req.params.sessionId;
         const questions = await questionService.getQuestions(sessionId);
 
+        console.log("Question Controller: getQuestions", questions);
+
         res.json(questions);
     } catch (error) {
         console.error("Error in getQuestions:", error);
