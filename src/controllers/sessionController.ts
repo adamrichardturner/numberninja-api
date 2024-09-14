@@ -12,7 +12,9 @@ export const createSession = async (req: Request, res: Response) => {
 
     const userId = uuidv5(firebaseUid, UUID_NAMESPACE);
 
-    const { mode, operations, range, difficulty, termA, termB } = req.body;
+    const { mode, operations, difficulty, termA, termB } = req.body;
+
+    console.log(mode, operations, difficulty, termA, termB);
 
     try {
         // Fetch all modes, difficulties, and operations
@@ -51,10 +53,9 @@ export const createSession = async (req: Request, res: Response) => {
             userId,
             modeObj.id,
             operationIds,
-            range,
             difficultyObj.id,
-            parseInt(termA),
-            parseInt(termB),
+            termA,
+            termB,
         );
 
         res.status(201).json({ sessionId });

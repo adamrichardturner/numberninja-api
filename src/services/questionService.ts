@@ -14,12 +14,21 @@ export const questionService = {
             }
 
             const session = sessionResult.rows[0];
+
+            console.log("SESSION", session);
             const { question_count } = session;
 
-            const rangeQuery =
-                "SELECT * FROM session_ranges WHERE session_id = $1";
-            const rangeResult = await client.query(rangeQuery, [sessionId]);
-            const { min_value, max_value } = rangeResult.rows[0];
+            const termsQuery =
+                "SELECT * FROM session_terms WHERE session_id = $1";
+            const termsResult = await client.query(termsQuery, [sessionId]);
+            const {
+                term_a_min,
+                term_a_max,
+                term_a_multiple,
+                term_b_min,
+                term_b_max,
+                term_b_multiple,
+            } = termsResult.rows[0];
 
             const operationsQuery =
                 "SELECT o.operation_name FROM session_operations so JOIN operations o ON so.operation_id = o.id WHERE so.session_id = $1";
@@ -33,7 +42,8 @@ export const questionService = {
 
             const questions = generateQuestions(
                 question_count,
-                { min: min_value, max: max_value },
+                { min: term_a_min, max: term_a_max, multiple: term_a_multiple },
+                { min: term_b_min, max: term_b_max, multiple: term_b_multiple },
                 operations as Operation[],
             );
 
