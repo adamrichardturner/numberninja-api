@@ -1,5 +1,5 @@
 import pool from "../config/database";
-import { generateQuestions, checkAnswer } from "../utils/questionGenerator";
+import { generateQuestions } from "../utils/questionGenerator";
 import { Operation } from "../types/session";
 
 export const questionService = {

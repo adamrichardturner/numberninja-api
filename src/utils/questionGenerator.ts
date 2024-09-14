@@ -123,30 +123,48 @@ const createValidQuestion = (
     range: Range,
 ): Question | null => {
     let correctAnswer: number;
-    let [a, b] = [numA, numB]; // New line
+    let difficulty: number = 0;
+
+    if (
+        numA === numB &&
+        (operation === "multiplication" ||
+            operation === "division" ||
+            operation === "subtraction")
+    )
+        return null; // Avoid identical numbers for multiplication, division, and subtraction
 
     switch (operation) {
         case "addition":
-            correctAnswer = a + b;
+            if (numA === 0 || numB === 0 || numA + numB === numA * 2)
+                return null;
+            correctAnswer = numA + numB;
+            difficulty = Math.min(numA, numB) / range.max;
             break;
         case "subtraction":
-            if (a < b) [a, b] = [b, a];
-            correctAnswer = a - b;
+            if (numA < numB) [numA, numB] = [numB, numA];
+            if (numB === 0 || numA === numB) return null;
+            correctAnswer = numA - numB;
+            difficulty = numB / range.max;
             break;
         case "multiplication":
-            correctAnswer = a * b;
+            if (numA === 1 || numB === 1 || numA === numB) return null; // Ensure numbers are not identical
+            correctAnswer = numA * numB;
+            difficulty = (numA * numB) / (range.max * range.max);
             break;
         case "division":
-            if (b === 0) return null;
-            correctAnswer = Math.floor(a / b);
-            a = correctAnswer * b; // Ensure clean division
+            if (numA === numB || numB === 1) return null; // Ensure numbers are not identical
+            correctAnswer = Math.floor(numA / numB);
+            numA = correctAnswer * numB; // Ensure clean division
+            difficulty = numB / range.max;
             break;
         default:
             throw new Error(`Invalid operation: ${operation}`);
     }
 
+    if (difficulty < 0.4) return null;
+
     return correctAnswer <= range.max && correctAnswer >= range.min
-        ? { numberA: a, numberB: b, operation, correctAnswer }
+        ? { numberA: numA, numberB: numB, operation, correctAnswer }
         : null;
 };
 
@@ -155,33 +173,47 @@ const createSimpleQuestion = (
     operation: Operation,
     rng: seedrandom.PRNG,
 ): Question => {
-    let numA = getRandomNumber(Math.max(1, range.min), range.max, rng);
-    let numB = getRandomNumber(Math.max(1, range.min), range.max, rng);
+    let numA = getRandomNumber(Math.max(2, range.min), range.max, rng);
+    let numB = getRandomNumber(Math.max(2, range.min), range.max, rng);
     let correctAnswer: number;
+
+    const createNewQuestion = () => createSimpleQuestion(range, operation, rng);
+
+    if (
+        numA === numB &&
+        (operation === "multiplication" ||
+            operation === "division" ||
+            operation === "subtraction")
+    )
+        return createNewQuestion(); // Prevent same-number multiplication, division, or subtraction
 
     switch (operation) {
         case "addition":
+            if (numA === 0 || numB === 0 || numA + numB === numA * 2)
+                return createNewQuestion();
             correctAnswer = numA + numB;
             break;
         case "subtraction":
             if (numA < numB) [numA, numB] = [numB, numA];
+            if (numB === 0 || numA === numB) return createNewQuestion();
             correctAnswer = numA - numB;
             break;
         case "multiplication":
+            if (numA === 1 || numB === 1 || numA === numB)
+                return createNewQuestion(); // Ensure numbers are not identical
             correctAnswer = numA * numB;
             break;
         case "division":
-            correctAnswer = numA;
-            numB = getRandomNumber(1, Math.min(numA, range.max), rng);
-            return {
-                numberA: numA * numB,
-                numberB: numB,
-                operation,
-                correctAnswer,
-            };
+            if (numA === numB || numB === 1) return createNewQuestion(); // Ensure numbers are not identical
+            correctAnswer = Math.floor(numA / numB);
+            if (correctAnswer === 1) return createNewQuestion();
+            numA = correctAnswer * numB; // Ensure clean division
+            break;
         default:
             throw new Error(`Invalid operation: ${operation}`);
     }
+
+    if (correctAnswer > range.max) return createNewQuestion();
 
     return { numberA: numA, numberB: numB, operation, correctAnswer };
 };
