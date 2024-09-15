@@ -6,19 +6,18 @@ export const performanceService = {
             SELECT 
                 s.id,
                 m.mode_name as mode,
-                d.level_name as difficulty,
-                string_agg(o.operation_name, ', ') as operations,
+                string_agg(o.operation_name, ', ' ORDER BY o.operation_name) as operations,
                 sr.min_value || '-' || sr.max_value as range,
                 s.question_count as total_questions,
                 COUNT(CASE WHEN ua.is_correct THEN 1 END) as correct_answers,
                 COUNT(CASE WHEN NOT ua.is_correct THEN 1 END) as wrong_answers,
-                AVG(ua.time_taken) as average_time,
-                SUM(ua.time_taken) as total_time,
+                COALESCE(AVG(ua.time_taken), 0) as average_time,
+                COALESCE(SUM(ua.time_taken), 0) as total_time,
+                s.overall_time_limit as time_limit,
                 s.ended_at as answered_at
             FROM 
                 sessions s
             LEFT JOIN modes m ON s.mode_id = m.id
-            LEFT JOIN difficulty_levels d ON s.difficulty_id = d.id
             LEFT JOIN session_operations so ON s.id = so.session_id
             LEFT JOIN operations o ON so.operation_id = o.id
             LEFT JOIN session_ranges sr ON s.id = sr.session_id
@@ -26,7 +25,7 @@ export const performanceService = {
             WHERE 
                 s.user_id = $1 AND s.is_completed = true
             GROUP BY
-                s.id, m.mode_name, d.level_name, sr.min_value, sr.max_value, s.question_count, s.ended_at
+                s.id, m.mode_name, sr.min_value, sr.max_value, s.question_count, s.overall_time_limit, s.ended_at
             ORDER BY 
                 s.ended_at DESC
         `;

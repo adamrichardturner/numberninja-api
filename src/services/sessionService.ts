@@ -1,19 +1,12 @@
 import pool from "../config/database";
 import { Answer } from "../types/Answer";
-import { Operation } from "../types/session";
-
-interface Term {
-    min: number;
-    max: number;
-    multiple: number;
-}
 
 export const sessionService = {
     createSession: async (
         userId: string,
         modeId: string,
         operationIds: string[],
-        difficultyId: string,
+        timeLimit: number,
         termA: { min: number; max: number; multiple: number },
         termB: { min: number; max: number; multiple: number },
     ): Promise<{ sessionId: string }> => {
@@ -22,8 +15,8 @@ export const sessionService = {
             await client.query("BEGIN");
 
             const sessionResult = await client.query(
-                "INSERT INTO sessions (user_id, mode_id, difficulty_id, question_count, overall_time_limit, started_at) VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING id",
-                [userId, modeId, difficultyId, 20, 600],
+                "INSERT INTO sessions (user_id, mode_id, question_count, overall_time_limit, started_at) VALUES ($1, $2, $3, $4, NOW()) RETURNING id",
+                [userId, modeId, 20, timeLimit],
             );
             const sessionId = sessionResult.rows[0].id;
 
@@ -81,18 +74,6 @@ export const sessionService = {
             "SELECT id, range_name FROM number_ranges",
         );
         return result.rows;
-    },
-
-    getDifficulties: async () => {
-        const client = await pool.connect();
-        try {
-            const result = await client.query(
-                "SELECT id, level_name FROM difficulty_levels",
-            );
-            return result.rows;
-        } finally {
-            client.release();
-        }
     },
 
     getQuestions: async (sessionId: string) => {

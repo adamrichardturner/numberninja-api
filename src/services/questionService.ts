@@ -15,7 +15,6 @@ export const questionService = {
 
             const session = sessionResult.rows[0];
 
-            console.log("SESSION", session);
             const { question_count } = session;
 
             const termsQuery =

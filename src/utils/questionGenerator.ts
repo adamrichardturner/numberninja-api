@@ -24,8 +24,13 @@ export const generateQuestions = (
 ): Promise<Question[]> => {
     return new Promise((resolve, reject) => {
         const questions: Question[] = [];
-        const usedQuestions = new Set<string>();
         const rng = seedrandom(Date.now().toString());
+        const operationCounts = operations.reduce(
+            (acc, op) => ({ ...acc, [op]: 0 }),
+            {} as Record<Operation, number>,
+        );
+        const targetCount = Math.ceil(questionCount / operations.length);
+        const isAdvancedMode = termA.multiple !== 1 || termB.multiple !== 1;
 
         const generateRandomInteger = (term: Term): number => {
             const newMin = Math.floor(term.min / term.multiple) + 1;
@@ -37,24 +42,40 @@ export const generateQuestions = (
         };
 
         const attemptGeneration = () => {
-            while (questions.length < questionCount) {
+            let attempts = 0;
+            const maxAttempts = questionCount * 50;
+
+            while (questions.length < questionCount && attempts < maxAttempts) {
+                attempts++;
+                const availableOperations = operations.filter(
+                    op => operationCounts[op] < targetCount,
+                );
+                if (availableOperations.length === 0) break;
+
+                const operation =
+                    availableOperations[
+                        Math.floor(rng() * availableOperations.length)
+                    ];
                 const numA = generateRandomInteger(termA);
                 const numB = generateRandomInteger(termB);
-                const operation =
-                    operations[Math.floor(rng() * operations.length)];
 
                 const question = createValidQuestion(numA, numB, operation);
 
                 if (question) {
-                    const questionKey = `${question.numberA}-${question.numberB}-${question.operation}`;
-                    if (!usedQuestions.has(questionKey)) {
-                        usedQuestions.add(questionKey);
-                        questions.push(question);
-                    }
+                    questions.push(question);
+                    operationCounts[operation]++;
                 }
             }
 
-            resolve(questions);
+            if (!isAdvancedMode && questions.length < questionCount) {
+                reject(
+                    new Error(
+                        "Failed to generate the required number of questions",
+                    ),
+                );
+            } else {
+                resolve(questions);
+            }
         };
 
         const timeoutId = setTimeout(() => {
