@@ -12,12 +12,11 @@ export const createSession = async (req: Request, res: Response) => {
 
     const userId = uuidv5(firebaseUid, UUID_NAMESPACE);
 
-    const { mode, operations, range, difficulty, termA, termB } = req.body;
+    const { mode, operations, termA, termB, timeLimit } = req.body;
 
     try {
         // Fetch all modes, difficulties, and operations
         const modes = await sessionService.getModes();
-        const difficulties = await sessionService.getDifficulties();
         const allOperations = await sessionService.getOperations();
 
         // Find the matching mode UUID
@@ -26,14 +25,6 @@ export const createSession = async (req: Request, res: Response) => {
         );
         if (!modeObj) {
             return res.status(400).json({ error: "Invalid mode" });
-        }
-
-        // Find the matching difficulty UUID
-        const difficultyObj = difficulties.find(
-            d => d.level_name.toLowerCase() === difficulty.toLowerCase(),
-        );
-        if (!difficultyObj) {
-            return res.status(400).json({ error: "Invalid difficulty" });
         }
 
         // Find the matching operation UUIDs
@@ -47,17 +38,20 @@ export const createSession = async (req: Request, res: Response) => {
             return operationObj.id;
         });
 
-        const sessionId = await sessionService.createSession(
+        const session = await sessionService.createSession(
             userId,
             modeObj.id,
             operationIds,
-            range,
-            difficultyObj.id,
-            parseInt(termA),
-            parseInt(termB),
+            timeLimit,
+            termA,
+            termB,
         );
 
-        res.status(201).json({ sessionId });
+        if (session.sessionId) {
+            res.status(201).json(session.sessionId);
+        } else {
+            res.status(500).json({ error: "Error creating session" });
+        }
     } catch (error: unknown) {
         if (error instanceof Error) {
             console.error("Error creating session:", error.message);
@@ -112,20 +106,6 @@ export const getRanges = async (req: Request, res: Response) => {
             console.error("Unexpected error:", error);
         }
         res.status(500).json({ error: "Error fetching ranges" });
-    }
-};
-
-export const getDifficulties = async (req: Request, res: Response) => {
-    try {
-        const difficulties = await sessionService.getDifficulties();
-        res.status(200).json(difficulties);
-    } catch (error: unknown) {
-        if (error instanceof Error) {
-            console.error("Error fetching difficulties:", error.message);
-        } else {
-            console.error("Unexpected error:", error);
-        }
-        res.status(500).json({ error: "Error fetching difficulties" });
     }
 };
 

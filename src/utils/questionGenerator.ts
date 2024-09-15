@@ -8,81 +8,74 @@ interface Question {
     correctAnswer: number;
 }
 
-interface Range {
+interface Term {
     min: number;
     max: number;
+    multiple: number;
 }
 
 const TIMEOUT = 15000; // 15 seconds timeout
 
 export const generateQuestions = (
     questionCount: number,
-    range: Range,
+    termA: Term,
+    termB: Term,
     operations: Operation[],
 ): Promise<Question[]> => {
     return new Promise((resolve, reject) => {
         const questions: Question[] = [];
-        const usedQuestions = new Set<string>();
+        const rng = seedrandom(Date.now().toString());
+        const operationCounts = operations.reduce(
+            (acc, op) => ({ ...acc, [op]: 0 }),
+            {} as Record<Operation, number>,
+        );
+        const targetCount = Math.ceil(questionCount / operations.length);
+        const isAdvancedMode = termA.multiple !== 1 || termB.multiple !== 1;
+
+        const generateRandomInteger = (term: Term): number => {
+            const newMin = Math.floor(term.min / term.multiple) + 1;
+            const newMax = Math.floor(term.max / term.multiple);
+            return (
+                Math.floor(rng() * (newMax - newMin + 1) + newMin) *
+                term.multiple
+            );
+        };
 
         const attemptGeneration = () => {
-            const seed = Date.now().toString();
-            const rng = seedrandom(seed);
-            const operationCounts: Record<Operation, number> =
-                operations.reduce(
-                    (acc, op) => ({ ...acc, [op]: 0 }),
-                    {} as Record<Operation, number>,
+            let attempts = 0;
+            const maxAttempts = questionCount * 50;
+
+            while (questions.length < questionCount && attempts < maxAttempts) {
+                attempts++;
+                const availableOperations = operations.filter(
+                    op => operationCounts[op] < targetCount,
                 );
+                if (availableOperations.length === 0) break;
 
-            while (questions.length < questionCount) {
-                const operation = getNextOperation(
-                    operations,
-                    operationCounts,
-                    rng,
-                );
-                let question: Question | null = null;
-                let attempts = 0;
+                const operation =
+                    availableOperations[
+                        Math.floor(rng() * availableOperations.length)
+                    ];
+                const numA = generateRandomInteger(termA);
+                const numB = generateRandomInteger(termB);
 
-                while (!question && attempts < 100) {
-                    const numA = getRandomNumber(
-                        Math.max(1, range.min),
-                        range.max,
-                        rng,
-                    );
-                    const numB = getRandomNumber(
-                        Math.max(1, range.min),
-                        range.max,
-                        rng,
-                    );
-                    question = createValidQuestion(
-                        numA,
-                        numB,
-                        operation,
-                        range,
-                    );
+                const question = createValidQuestion(numA, numB, operation);
 
-                    if (question) {
-                        const questionKey = `${question.numberA}-${question.numberB}-${question.operation}`;
-                        if (usedQuestions.has(questionKey)) {
-                            question = null;
-                        } else {
-                            usedQuestions.add(questionKey);
-                        }
-                    }
-
-                    attempts++;
+                if (question) {
+                    questions.push(question);
+                    operationCounts[operation]++;
                 }
-
-                if (!question) {
-                    question = createSimpleQuestion(range, operation, rng);
-                    const questionKey = `${question.numberA}-${question.numberB}-${question.operation}`;
-                    usedQuestions.add(questionKey);
-                }
-
-                questions.push(question);
-                operationCounts[operation]++;
             }
 
-            resolve(questions);
+            if (!isAdvancedMode && questions.length < questionCount) {
+                reject(
+                    new Error(
+                        "Failed to generate the required number of questions",
+                    ),
+                );
+            } else {
+                resolve(questions);
+            }
         };
 
         const timeoutId = setTimeout(() => {
@@ -91,129 +84,38 @@ export const generateQuestions = (
 
         attemptGeneration();
 
-        // Clear the timeout if questions are generated successfully
         clearTimeout(timeoutId);
     });
-};
-
-const getNextOperation = (
-    operations: Operation[],
-    operationCounts: Record<Operation, number>,
-    rng: seedrandom.PRNG,
-): Operation => {
-    const minCount = Math.min(...Object.values(operationCounts));
-    const candidateOperations = operations.filter(
-        op => operationCounts[op] === minCount,
-    );
-    return candidateOperations[Math.floor(rng() * candidateOperations.length)];
-};
-
-const getRandomNumber = (
-    min: number,
-    max: number,
-    rng: seedrandom.PRNG,
-): number => {
-    return Math.floor(rng() * (max - min + 1)) + min;
 };
 
 const createValidQuestion = (
     numA: number,
     numB: number,
     operation: Operation,
-    range: Range,
 ): Question | null => {
     let correctAnswer: number;
-    let difficulty: number = 0;
-
-    if (
-        numA === numB &&
-        (operation === "multiplication" ||
-            operation === "division" ||
-            operation === "subtraction")
-    )
-        return null; // Avoid identical numbers for multiplication, division, and subtraction
 
     switch (operation) {
         case "addition":
-            if (numA === 0 || numB === 0 || numA + numB === numA * 2)
-                return null;
             correctAnswer = numA + numB;
-            difficulty = Math.min(numA, numB) / range.max;
             break;
         case "subtraction":
             if (numA < numB) [numA, numB] = [numB, numA];
-            if (numB === 0 || numA === numB) return null;
             correctAnswer = numA - numB;
-            difficulty = numB / range.max;
             break;
         case "multiplication":
-            if (numA === 1 || numB === 1 || numA === numB) return null; // Ensure numbers are not identical
             correctAnswer = numA * numB;
-            difficulty = (numA * numB) / (range.max * range.max);
             break;
         case "division":
-            if (numA === numB || numB === 1) return null; // Ensure numbers are not identical
-            correctAnswer = Math.floor(numA / numB);
-            numA = correctAnswer * numB; // Ensure clean division
-            difficulty = numB / range.max;
+            if (numB === 0) return null;
+            if (numA % numB !== 0) return null;
+            correctAnswer = numA / numB;
             break;
         default:
             throw new Error(`Invalid operation: ${operation}`);
     }
 
-    if (difficulty < 0.4) return null;
-
-    return correctAnswer <= range.max && correctAnswer >= range.min
-        ? { numberA: numA, numberB: numB, operation, correctAnswer }
-        : null;
-};
-
-const createSimpleQuestion = (
-    range: Range,
-    operation: Operation,
-    rng: seedrandom.PRNG,
-): Question => {
-    let numA = getRandomNumber(Math.max(2, range.min), range.max, rng);
-    let numB = getRandomNumber(Math.max(2, range.min), range.max, rng);
-    let correctAnswer: number;
-
-    const createNewQuestion = () => createSimpleQuestion(range, operation, rng);
-
-    if (
-        numA === numB &&
-        (operation === "multiplication" ||
-            operation === "division" ||
-            operation === "subtraction")
-    )
-        return createNewQuestion(); // Prevent same-number multiplication, division, or subtraction
-
-    switch (operation) {
-        case "addition":
-            if (numA === 0 || numB === 0 || numA + numB === numA * 2)
-                return createNewQuestion();
-            correctAnswer = numA + numB;
-            break;
-        case "subtraction":
-            if (numA < numB) [numA, numB] = [numB, numA];
-            if (numB === 0 || numA === numB) return createNewQuestion();
-            correctAnswer = numA - numB;
-            break;
-        case "multiplication":
-            if (numA === 1 || numB === 1 || numA === numB)
-                return createNewQuestion(); // Ensure numbers are not identical
-            correctAnswer = numA * numB;
-            break;
-        case "division":
-            if (numA === numB || numB === 1) return createNewQuestion(); // Ensure numbers are not identical
-            correctAnswer = Math.floor(numA / numB);
-            if (correctAnswer === 1) return createNewQuestion();
-            numA = correctAnswer * numB; // Ensure clean division
-            break;
-        default:
-            throw new Error(`Invalid operation: ${operation}`);
-    }
-
-    if (correctAnswer > range.max) return createNewQuestion();
+    if (!Number.isInteger(correctAnswer)) return null;
 
     return { numberA: numA, numberB: numB, operation, correctAnswer };
 };
@@ -236,10 +138,11 @@ export const checkAnswer = (
             correctAnswer = numberA * numberB;
             break;
         case "division":
-            correctAnswer = Math.floor(numberA / numberB);
+            correctAnswer = numberA / numberB;
             break;
         default:
             throw new Error(`Invalid operation: ${operation}`);
     }
-    return correctAnswer.toString() === selectedAnswer;
+
+    return parseInt(selectedAnswer, 10) === correctAnswer;
 };

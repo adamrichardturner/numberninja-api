@@ -1,53 +1,49 @@
 import pool from "../config/database";
 import { Answer } from "../types/Answer";
-import { Operation } from "../types/session";
 
 export const sessionService = {
     createSession: async (
-        firebaseUid: string,
-        mode: string,
-        operations: Operation[],
-        range: { min: number; max: number },
-        difficulty: string,
-        termA: number,
-        termB: number,
-    ) => {
+        userId: string,
+        modeId: string,
+        operationIds: string[],
+        timeLimit: number,
+        termA: { min: number; max: number; multiple: number },
+        termB: { min: number; max: number; multiple: number },
+    ): Promise<{ sessionId: string }> => {
         const client = await pool.connect();
         try {
             await client.query("BEGIN");
 
-            // Insert session
             const sessionResult = await client.query(
-                "INSERT INTO sessions (user_id, mode_id, difficulty_id, question_count, overall_time_limit, started_at) VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING id",
-                [firebaseUid, mode, difficulty, 20, 600], // Adjust question_count and overall_time_limit as needed
+                "INSERT INTO sessions (user_id, mode_id, question_count, overall_time_limit, started_at) VALUES ($1, $2, $3, $4, NOW()) RETURNING id",
+                [userId, modeId, 20, timeLimit],
             );
             const sessionId = sessionResult.rows[0].id;
 
-            // Insert operations
-            for (const operation of operations) {
+            for (const operation of operationIds) {
                 await client.query(
                     "INSERT INTO session_operations (session_id, operation_id) VALUES ($1, $2)",
                     [sessionId, operation],
                 );
             }
 
-            // Insert range
-            const minValue = range.min ?? 1; // Provide a default value if min is null
-            const maxValue = range.max ?? 100; // Provide a default value if max is null
             await client.query(
-                "INSERT INTO session_ranges (session_id, min_value, max_value) VALUES ($1, $2, $3)",
-                [sessionId, minValue, maxValue],
-            );
-
-            // Insert terms
-            await client.query(
-                "INSERT INTO session_terms (session_id, term_a, term_b) VALUES ($1, $2, $3)",
-                [sessionId, termA, termB],
+                `INSERT INTO session_terms (session_id, term_a_min, term_a_max, term_a_multiple, term_b_min, term_b_max, term_b_multiple)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                [
+                    sessionId,
+                    termA.min,
+                    termA.max,
+                    termA.multiple,
+                    termB.min,
+                    termB.max,
+                    termB.multiple,
+                ],
             );
 
             await client.query("COMMIT");
 
-            return sessionId;
+            return { sessionId };
         } catch (error) {
             await client.query("ROLLBACK");
             throw error;
@@ -80,19 +76,10 @@ export const sessionService = {
         return result.rows;
     },
 
-    getDifficulties: async () => {
-        const client = await pool.connect();
-        try {
-            const result = await client.query(
-                "SELECT id, level_name FROM difficulty_levels",
-            );
-            return result.rows;
-        } finally {
-            client.release();
-        }
-    },
-
     getQuestions: async (sessionId: string) => {
+        if (typeof sessionId !== "string") {
+            throw new Error("Invalid sessionId: must be a string");
+        }
         const result = await pool.query(
             "SELECT * FROM questions WHERE session_id = $1",
             [sessionId],
