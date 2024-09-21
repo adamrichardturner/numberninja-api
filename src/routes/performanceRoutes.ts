@@ -2,9 +2,7 @@ import { Router } from "express";
 import {
     getSessionData,
     getOperationPerformance,
-    getStrugglingQuestions,
     getTotalStats,
-    getPerformanceOverTime,
     getCommonWrongAnswers,
 } from "../controllers/performanceController";
 import { authMiddleware } from "../middleware/authMiddleware";
@@ -17,17 +15,7 @@ router.get(
     authMiddleware,
     getOperationPerformance,
 );
-router.get(
-    "/performance/struggling-questions",
-    authMiddleware,
-    getStrugglingQuestions,
-);
 router.get("/performance/total-stats", authMiddleware, getTotalStats);
-router.get(
-    "/performance/performance-over-time",
-    authMiddleware,
-    getPerformanceOverTime,
-);
 router.get(
     "/performance/common-wrong-answers",
     authMiddleware,
