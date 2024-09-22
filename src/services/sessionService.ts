@@ -5,6 +5,7 @@ export const sessionService = {
     createSession: async (
         userId: string,
         modeId: string,
+        questionCount: number,
         operationIds: string[],
         timeLimit: number,
         termA: { min: number; max: number; multiple: number },
@@ -16,7 +17,7 @@ export const sessionService = {
 
             const sessionResult = await client.query(
                 "INSERT INTO sessions (user_id, mode_id, question_count, overall_time_limit, started_at) VALUES ($1, $2, $3, $4, NOW()) RETURNING id",
-                [userId, modeId, 20, timeLimit],
+                [userId, modeId, questionCount, timeLimit],
             );
             const sessionId = sessionResult.rows[0].id;
 
