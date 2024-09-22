@@ -4,6 +4,8 @@ import { v5 as uuidv5 } from "uuid";
 
 const UUID_NAMESPACE = "1b671a64-40d5-491e-99b0-da01ff1f3341";
 
+const DEFAULT_QUESTION_COUNT = 10;
+
 export const createSession = async (req: Request, res: Response) => {
     const firebaseUid = req.user?.uid;
     if (!firebaseUid) {
@@ -41,6 +43,7 @@ export const createSession = async (req: Request, res: Response) => {
         const session = await sessionService.createSession(
             userId,
             modeObj.id,
+            DEFAULT_QUESTION_COUNT,
             operationIds,
             timeLimit,
             termA,
