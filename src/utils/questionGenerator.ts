@@ -14,7 +14,7 @@ interface Term {
     multiple: number;
 }
 
-const TIMEOUT = 15000; // 15 seconds timeout
+const TIMEOUT = 15000;
 
 export const generateQuestions = (
     questionCount: number,
